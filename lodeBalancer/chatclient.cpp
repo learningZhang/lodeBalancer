@@ -27,7 +27,8 @@ typedef enum _MsgType
 //全局记录用户名和密码
 char name[20];
 char pwd[20];
-char call[20];
+
+
 //异步接收读线程
 void* ReadThread(void *arg)
 {
@@ -36,7 +37,7 @@ void* ReadThread(void *arg)
     Json::Reader reader;
     Json::Value root;
     int size=0;
-    
+
     while(true)
     {
         size = recv(clientfd, recvbuf, 1024, 0);
@@ -52,43 +53,93 @@ void* ReadThread(void *arg)
             {
                 case EN_MSG_CHAT:
                 {
-	                cout<<"recieve chat message:"<<endl;
-                    cout<<root["from"].asString()<<":"<<root["ackcode"].asString()<<endl;
-                    cout<<root.toStyledString().c_str()<<endl;
+                    cout<<root["from"].asString()<<":"<<root["msg"]<<endl;
                 }
                 break;
+                case EN_MSG_ACK:
+	            {
+		            cout<<root["ackcode"].asString()<<endl;
+	            }
+	            break;
             }
         }
     }
 }
-    
-bool doLogin(int fd)
+
+bool registe(int fd)//注册
+{
+	char email[20];
+	char passwd[20];
+	cout<<"your name: ";
+	cin.getline(name, 20);
+	cout<<"input passwd: ";
+	cin.getline(passwd, 20);
+	cout<<"your emial: ";
+	cin.getline(email, 20);
+	
+	Json::Value root;
+	root["msgtype"] = EN_MSG_REGISTER;
+	root["name"] = name;
+	root["passwd"] = passwd;
+	root["email"] = email;
+ 	char recvbuf[1024];
+	int size = send(fd, root.toStyledString().c_str(),
+	 	strlen(root.toStyledString().c_str()), 0);
+	if (size < 0)
+	{
+		cout<<"register info send fail"<<endl;
+		exit(0);
+	}
+
+	char recvbuff[1024];
+	size = recv(fd, recvbuf, 1024, 0);
+	if (size < 0)
+	{
+		cout<<"register info ack fail"<<endl;
+	}
+	 //检查返回信息如果正确就退到登陆界面
+	Json::Reader reader;
+	if(reader.parse(recvbuf, root))
+	{
+        	int msgtype = root["msgtype"].asInt();
+       		if(msgtype != EN_MSG_ACK)
+        	{
+            		cout<<"recv server login ack msg invalid!"<<endl;
+            		exit(0);
+        	}
+       		 string ackcode = root["ackcode"].asString();
+        	if(ackcode == "yes")
+        	{
+            		return true;
+        	}
+       		return false;
+    }
+    return false;
+}
+
+bool doLogin(int fd)//登陆
 {
     cout<<"name:";
     cin.getline(name, 20);
     cout<<"pwd:";
     cin.getline(pwd, 20);
     
-    //组装json字符串
     Json::Value root;
     root["msgtype"] = EN_MSG_LOGIN;
     root["name"] = name;
     root["pwd"] = pwd;
-    
-    //cout<<"json:"<<root.toStyledString()<<endl;
-    //发送登录消息到server
-    int size = send(fd, root.toStyledString().c_str(),
-        strlen(root.toStyledString().c_str())+1, 0);
+
+    cout<<"my fd is"<<fd<<endl;    
+    int size = send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str())+1, 0);
     if(size < 0)
     {
         cout<<"send login msg fail!"<<endl;
         exit(0);
     }
     
-    //接收server返回的登录消息
     char recvbuf[1024]={0};
     size = recv(fd, recvbuf, 1024, 0);
-    if(size < 0)
+    if(size <= 0)
     {
         cout<<"recv server login ack fail!"<<endl;
         exit(0);
@@ -113,60 +164,20 @@ bool doLogin(int fd)
     return false;
 }
 
-void Register(int fd)
+bool offline(int fd)
 {
-	cout<<"name:"<<endl;
-	cin.getline(name,20);
-	cout<<"pwd:"<<endl;
-	cin.getline(pwd,20);
-	cout<<"call:"<<endl;
-	cin.getline(call,20);
-
-	//组装json字符串
-	Json::Value root;
-    root["msgtype"] = EN_MSG_REGISTER;
-    root["name"] = name;
-    root["pwd"] = pwd;
-    root["call"] = call;
-
-    cout<<root.toStyledString()<<endl;
-	
-    //发送注册消息到server
-    int size = send(fd, root.toStyledString().c_str(),
-        strlen(root.toStyledString().c_str())+1, 0);
-    if(size < 0)
-    {
-        cout<<"send register msg fail!"<<endl;
-        exit(0);
-    }
-
-	//接受server返回的注册消息
-    char recvbuf[1024]={0};
-    size = recv(fd, recvbuf, 1024, 0);
-    if(size < 0)
-    {
-        cout<<"recv server register ack fail!"<<endl;
-        exit(0);
-    }
-    
-    Json::Reader reader;
-    if(reader.parse(recvbuf, root))
-    {
-        int msgtype = root["msgtype"].asInt();
-        if(msgtype != EN_MSG_ACK)
-        {
-            cout<<"recv server register ack msg invalid!"<<endl;
-            exit(0);
-        }
-        string ackcode = root["ackcode"].asString();
-        cout<<root.toStyledString()<<endl;
-        if(ackcode == "OK")
-        {
-            cout<<"register success!"<<endl;
-            return ;
-        }
-        cout<<"register error! the user is already register!"<<endl;
-    }
+	Json::Value  root;
+	root["msgtype"] = EN_MSG_OFFLINE;
+	int size = send(fd, root.toStyledString().c_str(), 
+			strlen(root.toStyledString().c_str()), 0);
+	if (size < 0)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
 }
 
 // 命令行参数传入服务器port
@@ -189,7 +200,6 @@ int main(int argc, char **argv)
     }
     
     sockaddr_in server;
-    memset(server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
     server.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -208,44 +218,34 @@ int main(int argc, char **argv)
         cout<<"1.login"<<endl;
         cout<<"2.register"<<endl;
         cout<<"3.exit"<<endl;
-        cout<<"============"<<endl;
+        cout<<"============"<<endl;   //异常退出-信号
         cout<<"choice:";
         cin>>choice;
         cin.get();
         
         switch(choice)
         {
-            case 1:
-            //login
-            if(doLogin(clientfd))
-            {
-                bloginsuccess = true;  
-            }
-            else
-            {
-                cout<<"login fail!name or pwd is wrong!"<<endl;
-            }  
-            break;
+            case 1://login
+            	if(doLogin(clientfd))    { bloginsuccess = true;}  
+            	else{cout<<"login fail!name or pwd is wrong!"<<endl;}  
+            	break;
+            
             case 2:
-            //register
-            	Register(clientfd);
-            continue;
+           	 if (registe(clientfd))    {cout<<"register successful!"<<endl;}
+           	 else {cout<<"register failed!"<<endl;}
+		 continue;
             case 3:
-            //exit
-           	 	cout<<"bye bye..."<<endl;
-           	 	//客户端退出后，服务器端仍存在
-            	exit(0);
-            break;
+		offline(clientfd);
+		close(clientfd);
+	        cout<<"bye bye..."<<endl;
+		exit(0);
             default:
                 cout<<"invalid input!"<<endl;
-            continue;
+		fflush(stdin);
+		continue;
         }
     }
-    
     cout<<"welcome to chat system!"<<endl;
-    //zhang lu cheng:msg sdfasdf
-    
-    //启动异步接收读线程
     pthread_t tid;
     pthread_create(&tid, NULL, ReadThread, &clientfd);
     
@@ -257,7 +257,10 @@ int main(int argc, char **argv)
         
         if(strcmp(chatbuf, "quit") == 0)
         {
-            exit(0);
+	        offline(clientfd);
+	        cout<<"by close to shutdown client"<<endl;
+		close(clientfd);
+                exit(0);
         }
         
         string parsestr = chatbuf;
@@ -267,11 +270,7 @@ int main(int argc, char **argv)
         root["from"] = name;
         root["to"] = parsestr.substr(0, offset);
         root["msg"] = parsestr.substr(offset+1, parsestr.length()-offset-1);
-        
-        //cout<<root.toStyledString().c_str()<<endl;
-        size = send(clientfd, root.toStyledString().c_str(),
-            strlen(root.toStyledString().c_str())+1, 0);
+        size = send(clientfd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str())+1, 0);
     }
-
     return 0;
 }
