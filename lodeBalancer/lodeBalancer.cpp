@@ -1,3 +1,24 @@
+#include <iostream>
+#include <string>
+#include <map>
+#include <list>
+using namespace std;
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <assert.h>
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <sys/epoll.h>
+#include <event.h>
+#include <json/json.h>
+#include <errno.h>
 //lb的主线程
 #define PORT 10000
 #define IP  "172.0.0.1"
@@ -5,6 +26,10 @@
 #define MAX 1000 //单线程中一个epoll最多可以接受的文件描述符
 #define FD_NUM 3 //服务器的个数
 int serverfd[FD_NUM];
+
+
+static int id = 0;
+map<int, int> fd;//用于记录fd和id的对应关系
 
 int main()
 {
@@ -24,6 +49,7 @@ int main()
 
 	list<int> worklist;
 	pthread_mutex_t mutex;
+	
 	assert(res != -1);
 	
 	res = pthread_mutex_init(&mutex, NULL);
@@ -44,11 +70,11 @@ int main()
 
 int get_first(list<int> x)
 {	
-	pthread_mutex_lock(&mutex);
 	if (x.empty())
 	{
 		return -1;
 	}
+	pthread_mutex_lock(&mutex);
 	list<int>::iterator it = x.begin();
 	int a = *it;
 	x.pop_front();
@@ -90,12 +116,25 @@ bool judge(int fd)//来自客户端就返回假
 	return false;
 }
 
-void connect_server(int port, char *ip, int index)
+void server_start()//向第index的服务器发送数据
 {
-	int port;
-	char *ip;
+	int port = 10000;//与聊天服务器相对应的客户端
+	char *ip = "127.0.0.1";
+	for(int i=0; i<FD_NUM; i++)
+	{
+		int ret = connect_server(port, ip, i);
+		if (ret == -1)
+		{
+			cout<<"server "<<ret<<" can't open"<<endl;
+			return ;
+		}
+	}
+}
+
+bool connect_server(int port, char *ip, int index)
+{
 	int clientfd = socket(AF_INET, SOCK_STREAM, 0);
-	assert(clientfd != -1);
+	if(clientfd == -1) {return false;}
 
 	sockaddr_in caddr;
 	memset(caddr, 0, sizeof(caddr));
@@ -104,9 +143,10 @@ void connect_server(int port, char *ip, int index)
 	caddr.sin_addr.s_addr = inet_addr(ip);
 
 	int ret = connect(clientfd, (sockaddr*)&caddr, sizeof(caddr));
-	assert(ret != -1);
+	if (ret == -1) {return false;}
 	
 	serverfd[index] = clientfd; //连接上服务端
+	return true;
 }
 
 void thread_func()
@@ -120,37 +160,58 @@ void thread_func()
 		res = epoll_wait(epollfd, events, MAX, -1);
 		char buff[1024];
 		int ret = 0;
-		for(int i=0; i<res; ++i)//客户端和服务端
+		for(int i=0; i<res; ++i)
 		{
+			Json::Value response;
+			Json::Reader reader;
+			Json::Value tempstr;
+			Json::Value root;
+			
 			int fd = eventns[i].data.fd;
-			if(judge(fd))//来自服务器的数据
+			
+			ret = recv(fd, buff, 1024, 0);//后面有对其进行判断
+			
+			reader.parse(buff, tempstr);
+			char * temp =tempstr["ID"];
+			
+			if(judge(fd))//服务器来的数据
 			{
-				ret = recv(fd, buff, 1024, 0);
+				int fd = get_fd(temp);//将字符串转化成正数，然后对正数进行map查找
+				
 				if (ret <= 0)
-				{
-					//与服务器断开了
+				{//与服务器断开了
 					cout<<"server down"<<endl;
 					return ;//设置 set_fd(-1) 
 				}
-				send();
+				ret = send(fd, tempstr["mesg"].asString().c_str(), strlen(tempstr["mesg"].asString().c_str()), 0);
+				if (ret <= 0){cout<<"send error"<<endl;}
 			}
-			else
+			else//客户端
 			{
 				int index = select_server();
-				
-				ret = recv(fd, buff, 1024, 0);
 				if (ret <= 0)
 				{
 					deleteEvent(epollfd, fd);//接收失败，断掉了连接
 					continue;
-				}				                                 
-
-				ret = send(serverfd[index], buff, sizeof(buff), 0);     
+				}
+              ///////////////////////////////
+				//对数据封装，发送给服务器
+				int id_num = get_id();
+				char temp[10];
+				sprintf(temp, "%d", id_num);
+							
+				response["logo"] = temp;
+				response["mesg"] = buff;
+				//////////////////
+				ret = send(serverfd[index], response.asString().c_str(), strlen(response.asString().c_str()), 0);     
+				
 				if (ret <= 0)
 				{
-					printf("error\n");
-				}                     
+					cout<<"error"<<endl;
+				}   
+		                
 			}
+			
 		}
 	}	
 }
@@ -164,7 +225,7 @@ int select_server(int fd)
 	return tag = (tag+1)%3;
 }
 
-int deleteEvent(int epfd, int op, int fd, struct epoll_event *event)
+int deleteEvent(int epfd,int fd, struct epoll_event *event)
 {
 	epoll_ctl(epfd, EPOLL_CTL_MOD, fd, event);
 }
@@ -185,3 +246,5 @@ int setnomblocking(int fd)//将文件描述符设置为非阻塞的
 	fcntl(fd, F_SETFL, new_option);
 	return old_option;
 }
+
+//如今的问题是，如何使得lb的服务端能正确的向相应的客户端发送消息
