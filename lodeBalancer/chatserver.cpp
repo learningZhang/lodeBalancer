@@ -1,40 +1,4 @@
-#include <iostream>
-#include <string>
-#include <map>
-using namespace std;
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <assert.h>
-#include <stdio.h>
-#include <signal.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <sys/epoll.h>
-#include <event.h>
-#include <json/json.h>
-#include <errno.h>
-
-class User
-{
-public:
-    User(){}
-    User(string name, string pwd, string call)
-        :_name(name), _pwd(pwd), _call(call){}
-    string getName(){return _name;}
-    string getPwd(){return _pwd;}
-private:
-    string _name;
-    string _pwd;
-    string _call;
-};
-
-map<string, User> gUserDBMap;
-map<string, int> chat;
+#include "head.h"
 
 typedef enum _MsgType
 {
@@ -47,56 +11,56 @@ typedef enum _MsgType
 
 void* ReadThread(void *arg)
 {
-
+	CMysql db;
     int clientfd = (int)arg;
     while(true)
     {//接收client发送的消息，处理，响应
         int size = 0;
         char recvbuf[1024]={0};
+        
+        Json::Value tempbuff;
         Json::Reader reader;
         Json::Value root;
         Json::Value response;
 	
-	size = recv(clientfd, recvbuf, 1024, 0);
-	if(size <= 0)//when a client closed,the size is 0
+		size = recv(clientfd, recvbuf, 1024, 0);
+		if(size <= 0)//when a client closed,the size is 0
         {
             cout<<"errno:"<<errno<<endl;
             cout<<"client connect fail!"<<endl;
             close(clientfd);
             return NULL;
         }
-    
+        
+      reader.parse(recvbuf, tempbuff);//褪去标签
+      const char *strtmp = tempbuff["ID"].asString().c_str();
+
         cout<<"recvbuf:"<<recvbuf<<endl;
         
-        if(reader.parse(recvbuf, root))//判断的是什么
+        if(reader.parse(tempbuff.asString().c_str(), root))//判断的是什么
         {
             int msgtype = root["msgtype"].asInt();
             switch(msgtype)
             {
+	            response["ID"] = strtmp;//将标签重新加上
+	            
                 case EN_MSG_LOGIN:
                 {
                     response["msgtype"] = EN_MSG_ACK;
                     string name = root["name"].asString();
                     string pwd = root["pwd"].asString();
-                    
-                    map<string, User>::iterator it = gUserDBMap.find(name);
-                    if(it == gUserDBMap.end())
+
+                    if(db.queryPasswd(name.c_str(), pwd.c_str()))
                     {
-                        response["ackcode"] = "error";
+                        response["ackcode"] = "ok";
+                        clientfd = db.getStates(name.c_str());
+                        //chat[name.c_str()] = clientfd;//用户登陆成功之时记录键值对<name, fd>
+                        cout<<"name"<<name<<"  fd"<<clientfd<<endl;
                     }
                     else
                     {
-                        if(pwd == it->second.getPwd())
-                        {
-                            response["ackcode"] = "ok";
-                            chat[name.c_str()] = clientfd;//用户登陆成功之时记录键值对<name, fd>
-                            cout<<"name"<<name<<"  fd"<<clientfd<<endl;
-                        }
-                        else
-                        {
-                            response["ackcode"] = "error";
-                        }
-                    }
+                        response["ackcode"] = "error";
+              		}
                     cout<<"response:"<<response.toStyledString()<<endl;
                     send(clientfd, response.toStyledString().c_str(),
                         strlen(response.toStyledString().c_str())+1, 0);
@@ -106,13 +70,14 @@ void* ReadThread(void *arg)
                 case EN_MSG_CHAT:
                 {
                     cout<<root["from"]<<" => "<<root["to"]<<":"<<root["msg"]<<endl;    
-                   	map<string, int>::iterator it = chat.find(root["to"].asString());
-					if(it != chat.end())
+                   //	map<string, int>::iterator it = chat.find(root["to"].asString());
+					clientfd = db.getStates(root["to"].asString().c_str());
+					if(clientfd != -1)
 					{
 						response["msgtype"] = EN_MSG_CHAT;
 						response["from"] = root["from"].asString();
 						response["msg"] = root["msg"].asString();
-						send(it->second, response.toStyledString().c_str(), strlen(response.toStyledString().c_str())+1,0);
+						send(clientfd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str())+1,0);
 					}
 					else
 					{
@@ -129,9 +94,15 @@ void* ReadThread(void *arg)
 					string name = root["name"].asString();
 					string passwd = root["passwd"].asString();
 					string email = root["email"].asString();
-		   		    gUserDBMap[name] = User(name, passwd, email);
+		   		   // gUserDBMap[name] = User(name, passwd, email);
+		   		   	if(!db.insertIntoUser(name.c_str(), passwd.c_str(), email.c_str()))
+					{
+						cout<<"do it fail"<<endl;
+					}
+
 		      		response["msgtype"] = EN_MSG_ACK;
 		       		response["ackcode"] = "yes";
+			cout<<"must do it"<<endl;
 		        	send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
 				}     
 	      		break;
@@ -163,21 +134,17 @@ void ProcListenfd(evutil_socket_t fd, short , void *arg)
     pthread_create(&tid, NULL, ReadThread, (void*)clientfd);
 }
 
+
 int main()
 {
     int listenfd;
-    
-    gUserDBMap["zhang"] = User("zhang", "111", "9870986796");
-    gUserDBMap["xiao"] = User("xiao", "222", "7777777");
-    gUserDBMap["gao yang"] = User("gao yang", "333333", "66666666");
-    
+
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if(listenfd == -1)
     {
         cout<<"listenfd create fail!"<<endl;
         return -1;
     }
-    
     sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_port = htons(10000);
@@ -212,3 +179,21 @@ int main()
     
     return 0;
 }
+
+/*
+class User
+{
+public:
+    User(){}
+    User(string name, string pwd, string call)
+        :_name(name), _pwd(pwd), _call(call){}
+    string getName(){return _name;}
+    string getPwd(){return _pwd;}
+private:
+    string _name;
+    string _pwd;
+    string _call;
+};
+map<string, User> gUserDBMap;
+map<string, int> chat;
+*/

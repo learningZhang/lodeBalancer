@@ -183,14 +183,8 @@ bool offline(int fd)
 // 命令行参数传入服务器port
 int main(int argc, char **argv)
 {
-    if(argc < 2)
-    {
-        cout<<"input ./client port"<<endl;
-        return -1;
-    }
-    int port=0;
-    port = atoi(argv[1]);
-    
+
+    int port=10000;
     int clientfd;
     clientfd = socket(AF_INET, SOCK_STREAM, 0);
     if(clientfd == -1)
@@ -199,12 +193,13 @@ int main(int argc, char **argv)
         return -1;
     }
     
-    sockaddr_in server;
+    sockaddr_in caddr;
+    memset(&caddr, 0, sizeof(caddr));
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
     server.sin_addr.s_addr = inet_addr("127.0.0.1");
     
-    if(-1 == connect(clientfd, (sockaddr*)&server, sizeof(server)))
+    if(-1 == connect(clientfd, (sockaddr*)&caddr, sizeof(caddr)))
     {
         cout<<"connect server fail!"<<endl;
         return -1;
@@ -221,8 +216,7 @@ int main(int argc, char **argv)
         cout<<"============"<<endl;   //异常退出-信号
         cout<<"choice:";
         cin>>choice;
-        cin.get();
-        
+	cin.get();
         switch(choice)
         {
             case 1://login
@@ -242,6 +236,7 @@ int main(int argc, char **argv)
             default:
                 cout<<"invalid input!"<<endl;
 		fflush(stdin);
+		memset(&choice, 0 ,sizeof(int));
 		continue;
         }
     }
