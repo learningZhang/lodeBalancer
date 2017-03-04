@@ -184,7 +184,7 @@ bool offline(int fd)
 int main(int argc, char **argv)
 {
 
-    int port=10000;
+    int port=10001;
     int clientfd;
     clientfd = socket(AF_INET, SOCK_STREAM, 0);
     if(clientfd == -1)
@@ -195,16 +195,16 @@ int main(int argc, char **argv)
     
     sockaddr_in caddr;
     memset(&caddr, 0, sizeof(caddr));
-    server.sin_family = AF_INET;
-    server.sin_port = htons(port);
-    server.sin_addr.s_addr = inet_addr("127.0.0.1");
+    caddr.sin_family = AF_INET;
+    caddr.sin_port = htons(port);
+    caddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     
     if(-1 == connect(clientfd, (sockaddr*)&caddr, sizeof(caddr)))
     {
         cout<<"connect server fail!"<<endl;
         return -1;
     }
-   
+   cout<<"connect over"<<endl;
     int choice = 0;
     bool bloginsuccess = false;
     while(!bloginsuccess)

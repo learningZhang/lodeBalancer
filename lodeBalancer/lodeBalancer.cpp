@@ -1,15 +1,12 @@
 #include "head.h"
 
 //lb的主线程
-#define PORT 10000
-#define IP  "172.0.0.1"
-#define THREAD_NUM  10
+#define THREAD_NUM  3
 #define MAX 1000 //单线程中一个epoll最多可以接受的文件描述符
 #define FD_NUM 3 //服务器的个数
 
 int serverfd[FD_NUM];
-static int id = 0;
-//map<int, int> fdLog;//用于记录fd和id的对应关系
+static int id = 0;//map<int, int> fdLog;//用于记录fd和id的对应关系
 
 list<int> worklist;
 pthread_mutex_t mutex;
@@ -20,19 +17,26 @@ int main()
 	assert(sockfd != -1);
 
 	sockaddr_in saddr;
-	memset(&saddr, 0, sizeof(saddr));
+	memset(&saddr, 0, sizeof(sockaddr_in));
 	saddr.sin_family = AF_INET;
-	saddr.sin_port = htons(PORT);
-	saddr.sin_addr.s_addr = inet_addr(IP);
+	saddr.sin_port = htons(10001);
+	saddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-	int res = bind(sockfd, (sockaddr*)&saddr, sizeof(saddr));
-	assert(res != -1);
-
-	listen(sockfd, 5);
+	if (-1 == bind(sockfd, (sockaddr*)&saddr, sizeof(saddr)))
+	{
+		cout<<"error in bind"<<endl;
+		return -1;
+	}
+	
+	if (-1 == listen(sockfd, 5))
+	{
+		cout<<"error in listen"<<endl;
+		return -1;
+	}
 
 	list<int> worklist;
 
-	res = pthread_mutex_init(&mutex, NULL);
+	int res = pthread_mutex_init(&mutex, NULL);
 	assert(res != -1);
 
  	struct event_base *base = event_init();
@@ -40,12 +44,12 @@ int main()
 	struct event *listen_event = event_new(base, sockfd, EV_READ|EV_PERSIST, Listenfd, NULL);
 	
     event_add( listen_event, NULL );
+
+    server_start();//启动服务器
+    pthread_pool();//建立线程池
     
     cout<<"lb started..."<<endl;
     
-    server_start();//启动服务器
-	pthread_pool();//建立线程池
-	
     event_base_dispatch(base);
     event_free(listen_event);
     event_base_free(base);
@@ -76,7 +80,7 @@ void Listenfd(evutil_socket_t fd, short int , void *arg)
     //在此将fd传递给线程池中的线程  请求队列--先进先出
     pthread_mutex_lock(&mutex);      //栈--替换队列
     
-	CMysql db;
+    CMysql db;
     worklist.push_back(clientfd);//向对列尾部添加数据
     //fdLog[id] = clientfd;//向map中添加fd--id的记录
 	db.insertInto_serverfd(id, fd);//向map中添加fd--id的记录
@@ -91,6 +95,7 @@ void pthread_pool()
 	{
 		int res = pthread_create(&tid, NULL, thread_func, NULL);
 		assert(res != -1);
+		cout<<"pthread["<<i<<"]  open"<<endl;
 	}
 }
 
@@ -118,6 +123,7 @@ void server_start()//向第index的服务器发送数据
 			cout<<"server "<<ret<<" can't open"<<endl;
 			return ;
 		}
+		cout<<"server["<<i<<"]   open"<<endl;
 	}
 }
 
@@ -141,8 +147,10 @@ bool connect_server(int port, char *ip, int index)
 
 void* thread_func(void *)
 {
-	CMysql db;
+	//线程从工作队列中拿取任务，拿到任务可以进行下面活动
+	//如何确保有任务的时候拿，没任务的时候不拿？？？？？？？
 	int pfd = get_first(worklist);
+	CMysql db;
 	int epollfd =  epoll_create(50);
 	epoll_event events[50];
 	int res = 0;
@@ -154,13 +162,14 @@ void* thread_func(void *)
 
 		Json::Value response;
 		Json::Reader reader;
-		Json::Value tempstr;	
+		Json::Value tempstr;
 		Json::Value root;
 
 		for(int i=0; i<res; ++i)
 		{			
 			int fd = events[i].data.fd;
 			ret = recv(fd, buff, 1024, 0);
+			cout<<"recv buff"<<buff<<endl;
 			if(judge(fd))//服务器来的数据：服务器来的数据上要先解封在发给客户端
 			{						//考虑数据包的大小，防止分包
 				if (ret <= 0)
@@ -173,6 +182,7 @@ void* thread_func(void *)
 				const char *temp =tempstr["ID"].asString().c_str();
 				int fd = db.get_fd(atoi(temp));
 				                   //将信息发送给相应的客户端
+				cout<<"from server  to client"<<tempstr["mesg"].asString().c_str()<<endl;
 				ret = send(fd, tempstr["mesg"].asString().c_str(), strlen(tempstr["mesg"].asString().c_str()), 0);
 				if (ret <= 0){cout<<"send error"<<endl;}
 			}
@@ -192,6 +202,7 @@ void* thread_func(void *)
 				response["ID"] = temp;
 				response["mesg"] = buff;
 				
+				cout<<"from client to server["<<index<<"]   "<<response.asString().c_str()<<endl;
 				ret = send(serverfd[index], response.asString().c_str(), strlen(response.asString().c_str()), 0);     
 				
 				if (ret <= 0)

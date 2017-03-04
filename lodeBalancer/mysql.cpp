@@ -25,7 +25,7 @@ CMysql::CMysql()
 bool CMysql::insertInto_serverfd(int fd, int id)
 {
 	char sql[100];
-	sprintf(sql, "insert into serverfd values('%s', '%s', '%s')", id, fd);
+	sprintf(sql, "insert into serverfd values( '%s', '%s')", id, fd);
 	if (!mysql_real_query(pcon, sql, strlen(sql)))
 	{
 		return true;

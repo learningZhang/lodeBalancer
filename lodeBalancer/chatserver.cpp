@@ -146,6 +146,7 @@ int main()
         return -1;
     }
     sockaddr_in server;
+    memset(&server, 0, sizeof(sockaddr_in));
     server.sin_family = AF_INET;
     server.sin_port = htons(10000);
     server.sin_addr.s_addr = inet_addr("127.0.0.1");
