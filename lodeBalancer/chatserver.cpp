@@ -119,8 +119,6 @@ void* ReadThread(void *arg)
     }
 }
 
-
-
 void ProcListenfd(evutil_socket_t fd, short , void *arg)
 {
     sockaddr_in client;
@@ -133,7 +131,6 @@ void ProcListenfd(evutil_socket_t fd, short , void *arg)
     pthread_t tid;
     pthread_create(&tid, NULL, ReadThread, (void*)clientfd);
 }
-
 
 int main()
 {

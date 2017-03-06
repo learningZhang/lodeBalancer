@@ -1,5 +1,5 @@
 #include "head.h"
-
+include<semaphore.h>
 //lb的主线程
 #define THREAD_NUM  3
 #define MAX 1000 //单线程中一个epoll最多可以接受的文件描述符
@@ -10,6 +10,7 @@ static int id = 0;//map<int, int> fdLog;//用于记录fd和id的对应关系
 
 list<int> worklist;
 pthread_mutex_t mutex;
+sem_t sem;
 
 int main()
 {
@@ -35,7 +36,8 @@ int main()
 	}
 
 	list<int> worklist;
-
+	sem_init(&sem,0,0);
+	 
 	int res = pthread_mutex_init(&mutex, NULL);
 	assert(res != -1);
 
@@ -76,16 +78,20 @@ void Listenfd(evutil_socket_t fd, short int , void *arg)
 	sockaddr_in client;
     socklen_t len = sizeof(client);
     int clientfd = accept(fd, (sockaddr*)&client, &len);
+    assert(clientfd != -1);
     cout<<"new client connect server! client info:"<<inet_ntoa(client.sin_addr)<<" "<<ntohs(client.sin_port)<<endl;
     //在此将fd传递给线程池中的线程  请求队列--先进先出
-    pthread_mutex_lock(&mutex);      //栈--替换队列
     
+    pthread_mutex_lock(&mutex);      //栈--替换队列
+    cout<<"this client fd is"<<clientfd<<endl;
     CMysql db;
     worklist.push_back(clientfd);//向对列尾部添加数据
     //fdLog[id] = clientfd;//向map中添加fd--id的记录
 	db.insertInto_serverfd(id, fd);//向map中添加fd--id的记录
 	id++;
     pthread_mutex_unlock(&mutex);
+    sem_post(&sem);
+    cout<<"new elem insert into worklist"<<endl;
 }
 
 void pthread_pool()
@@ -134,6 +140,7 @@ bool connect_server(int port, char *ip, int index)
 
 	sockaddr_in caddr;
 	memset(&caddr, 0, sizeof(caddr));
+	
 	caddr.sin_family = AF_INET;
 	caddr.sin_port = htons(port);
 	caddr.sin_addr.s_addr = inet_addr(ip);
@@ -149,13 +156,18 @@ void* thread_func(void *)
 {
 	//线程从工作队列中拿取任务，拿到任务可以进行下面活动
 	//如何确保有任务的时候拿，没任务的时候不拿？？？？？？？
-	int pfd = get_first(worklist);
 	CMysql db;
 	int epollfd =  epoll_create(50);
 	epoll_event events[50];
 	int res = 0;
+	int pfd;
+	cout<<res<<endl;
 	while(true)
 	{
+		sem_wait(&sem);
+		pfd = get_first(worklist);//从工作队列中拿不到正常数据
+		cout<<"pfd  is  ："<<pfd<<endl;
+		addEvent(epollfd, fd);
 		res = epoll_wait(epollfd, events, MAX, -1);
 		char buff[1024];
 		int ret = 0;

@@ -25,7 +25,7 @@ CMysql::CMysql()
 bool CMysql::insertInto_serverfd(int fd, int id)
 {
 	char sql[100];
-	sprintf(sql, "insert into serverfd values( '%s', '%s')", id, fd);
+	sprintf(sql, "insert into serverfd values('%d','%d')", id, fd);
 	if (!mysql_real_query(pcon, sql, strlen(sql)))
 	{
 		return true;
@@ -33,12 +33,10 @@ bool CMysql::insertInto_serverfd(int fd, int id)
 	return false;
 }
 
-
-bool CMysql::get_fd(int id)
+int CMysql::get_fd(int id)
 {
 	char sql[100];
-	memset(sql, 0, 100);
-	sprintf(sql, "select fd from serverfd where id='%s'", id);
+	sprintf(sql, "select fd from serverfd where id=%d", id);
 	if (mysql_real_query(pcon, sql, strlen(sql)))
 	{
 		mysql_error(pcon);	
@@ -49,30 +47,31 @@ bool CMysql::get_fd(int id)
 	row = mysql_fetch_row(pres);
 	for(int i=0; i<mysql_num_fields(pres); ++i)
 	{
-		int id = 0;
-	 	id = atoi(row[i]);
+		cout<<"row is "<<row[i]<<endl;
+		int id = atoi(row[i]);
+		cout<<id;
 		return id;
 	}
 	return -1;
 }
-
-bool CMysql::get_id(int fd)
+int CMysql::get_id(int fd)
 {
 	char sql[100];
-	memset(sql, 0, 100);
-	sprintf(sql, "select id from serverfd where fd='%s'", fd);
+	sprintf(sql, "select id from serverfd where fd=%d ", fd);
 	if (mysql_real_query(pcon, sql, strlen(sql)))
 	{
-		mysql_error(pcon);	
+		mysql_error(pcon);
 		cout<<"error in getstate"<<endl;
 	}
 
 	pres = mysql_store_result(pcon);
 	row = mysql_fetch_row(pres);
+	
 	for(int i=0; i<mysql_num_fields(pres); ++i)
 	{
-		int fd = 0;
-	 	fd = atoi(row[i]);
+		cout<<"row is "<<row[i]<<endl;
+		int fd = atoi(row[i]);
+		cout<<"fd is"<<fd<<endl;
 		return fd;
 	}
 	return -1;	
