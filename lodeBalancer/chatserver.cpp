@@ -11,46 +11,41 @@ typedef enum _MsgType
 
 void* ReadThread(void *arg)
 {
-	CMysql db;
+    CMysql db;
     int clientfd = (int)arg;
     while(true)
     {//接收client发送的消息，处理，响应
         int size = 0;
         char recvbuf[1024]={0};
         
-        Json::Value tempbuff;
         Json::Reader reader;
         Json::Value root;
         Json::Value response;
-	
-		size = recv(clientfd, recvbuf, 1024, 0);
-		if(size <= 0)//when a client closed,the size is 0
+
+	size = recv(clientfd, recvbuf, 1024, 0);
+	if (size <= 0)//when a client closed,the size is 0
         {
             cout<<"errno:"<<errno<<endl;
             cout<<"client connect fail!"<<endl;
             close(clientfd);
             return NULL;
         }
-        
-      reader.parse(recvbuf, tempbuff);//褪去标签
-      const char *strtmp = tempbuff["ID"].asString().c_str();
+       cout<<"recvbuff is : "<<recvbuf<<endl;
+  		if (reader.parse(recvbuf, root))
+		{
+			cout<<"name :"<<root["name"].asString().c_str()<<endl;
 
-        cout<<"recvbuf:"<<recvbuf<<endl;
-        
-        if(reader.parse(tempbuff.asString().c_str(), root))//判断的是什么
-        {
-            int msgtype = root["msgtype"].asInt();
+           	int msgtype = root["msgtype"].asInt();
+			cout<<"msgtype  is: "<<msgtype<<endl;
+
             switch(msgtype)
             {
-	            response["ID"] = strtmp;//将标签重新加上
-	            
+	        	response["ID"] = root["ID"].asString().c_str();//将标签重新加上	            
                 case EN_MSG_LOGIN:
                 {
                     response["msgtype"] = EN_MSG_ACK;
                     string name = root["name"].asString();
-                    string pwd = root["pwd"].asString();
-
-                    if(db.queryPasswd(name.c_str(), pwd.c_str()))
+                    if(db.queryPasswd(name.c_str(), root["pwd"].asString().c_str()))
                     {
                         response["ackcode"] = "ok";
                         clientfd = db.getStates(name.c_str());
@@ -60,10 +55,11 @@ void* ReadThread(void *arg)
                     else
                     {
                         response["ackcode"] = "error";
-              		}
+              	    }
                     cout<<"response:"<<response.toStyledString()<<endl;
                     send(clientfd, response.toStyledString().c_str(),
                         strlen(response.toStyledString().c_str())+1, 0);
+			cout<<"login send : "<<response.toStyledString().c_str()<<endl;
                 }
                 break;
                 
@@ -78,6 +74,7 @@ void* ReadThread(void *arg)
 						response["from"] = root["from"].asString();
 						response["msg"] = root["msg"].asString();
 						send(clientfd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str())+1,0);
+						cout<<"chat send : "<<response.toStyledString().c_str()<<endl;
 					}
 					else
 					{
@@ -89,21 +86,22 @@ void* ReadThread(void *arg)
                 }
                 break;
 
-                case EN_MSG_REGISTER:
+              	case EN_MSG_REGISTER:
 				{
 					string name = root["name"].asString();
 					string passwd = root["passwd"].asString();
 					string email = root["email"].asString();
 		   		   // gUserDBMap[name] = User(name, passwd, email);
-		   		   	if(!db.insertIntoUser(name.c_str(), passwd.c_str(), email.c_str()))
+		   		   	if (!db.insertIntoUser(name.c_str(), passwd.c_str(), email.c_str()))
 					{
 						cout<<"do it fail"<<endl;
 					}
 
 		      		response["msgtype"] = EN_MSG_ACK;
 		       		response["ackcode"] = "yes";
-			cout<<"must do it"<<endl;
+					cout<<"must do it"<<endl;
 		        	send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
+				cout<<"register send :"<<response.toStyledString().c_str()<<endl;
 				}     
 	      		break;
 

@@ -31,8 +31,8 @@ class CMysql
 		int getStates(const char *name);
 		bool insertIntoStates(const char *name, int fd);
 		bool insertInto_serverfd(int fd, int id);
-		bool get_fd(int id);
-		bool get_id(int fd);
+		int  get_fd(int id);
+		int  get_id(int fd);
 	private:
 		MYSQL *pcon;
 	 	MYSQL_RES *pres;
@@ -44,7 +44,7 @@ class CMysql
 		unsigned short port;
 };
 
-int get_first(list<int> x);
+int get_first(list<int> &x);
 
 void Listenfd(evutil_socket_t fd, short int, void *arg);
 

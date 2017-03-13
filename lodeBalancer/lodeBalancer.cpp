@@ -42,28 +42,19 @@ int main()
 	sem_init(&sem,0,0);
 	//主线程之中建立无名管道，线程之间的文件描述符是共享的，让主线程收到c之后，而子线程中监视这个文件描述符号
 	//一旦子线程中发现该描述符，就添加C到该线程的epool中
-	 
 	int res = pthread_mutex_init(&mutex, NULL);
 	assert(res != -1);
-
  	struct event_base *base = event_init();
-
-	struct event *listen_event = event_new(base, sockfd, EV_READ|EV_PERSIST, Listenfd, NULL);
-	
-    	event_add( listen_event, NULL );
-
-    	int temp = pipe(ppfd);
-    	assert(temp != -1);
-    	
 	server_start();//启动服务器
     	pthread_pool();//建立线程池
-    
+	struct event *listen_event = event_new(base, sockfd, EV_READ|EV_PERSIST, Listenfd, NULL);
+    	event_add( listen_event, NULL );
+    	int temp = pipe(ppfd);
+    	assert(temp != -1);
     	cout<<"lb started..."<<endl;
-    
    	event_base_dispatch(base);
     	event_free(listen_event);
     	event_base_free(base);
-    
     	return 0;
 }
 //是否存在主线程死亡，从线程活着
@@ -91,7 +82,6 @@ void Listenfd(evutil_socket_t fd, short int , void *arg)
 		cout<<"write to pipe error"<<endl;
 	}
 	cout<<"pipe_buff is(in listenfd) "<<pipe_buff<<endl;
-
 //	sem_post(&sem);//调试间使用
     	cout<<"new elem insert into worklist"<<endl;
 }
@@ -106,10 +96,11 @@ void* thread_func(void *)
 	char buff[1024];
 	int ret = 0;
 	int res = 0;
+	addEvent(epollfd, serverfd[0]);
+	addEvent(epollfd, serverfd[1]);
+	addEvent(epollfd, serverfd[2]);
   	Json::Value response;
 	Json::Reader reader;
-	Json::Value tempstr;
-	Json::Value root;
 //	if (sem_wait(&sem) == -1) //调试过程中使用，之后删除
 //	{
 //		if (errno != EINTR)
@@ -123,50 +114,51 @@ void* thread_func(void *)
 				return NULL;
 		}
 
-		int pfd = 0;	
-			//进不到循环中去	
+		int pfd = 0;		
 		for(int i=0; i<res; ++i)
 		{			
 			int fd = events[i].data.fd;
 			cout<<"in events fd is: "<<events[i].data.fd<<endl;
 			if (events[i].data.fd == ppfd[0])
 			{
-			
-				int pipebuff[10]={0};
+				char pipebuff[10]={0};
 				if((ret = read(ppfd[0], pipebuff, 10)) == -1)
 				{
 					cout<<" ai ya get pipe file error"<<endl;
 				}
-				//cout<<"worklist  "<<worklist<<endl;
 			    	int t = get_first(worklist);
-				
+				cout<<"t is  : "<<t<<endl;
 				addEvent(epollfd, t);
-				cout<<"t is"<<endl;
-				cout<<"buff is"<<pipebuff<<endl;
-
+				cout<<"buff is "<<pipebuff<<endl;
 			}
 			else if (judge(fd))//服务器来的数据：服务器来的数据上要先解封在发给客户端
 			{						//考虑数据包的大小，防止分包
-			    	ret = recv(fd, buff, 1024, 0);
+		    	ret = recv(fd, buff, 1024, 0);
 				if (ret <= 0) {cout<<"error in recv from server"<<endl;}
-		    		cout<<"recv buff"<<buff<<endl;
+	    		cout<<"recv buff"<<buff<<endl;
 				if (ret <= 0)
 				{
 					cout<<"server down"<<endl;
 					continue ;//设置 set_fd(-1) 
 				}
-				
-				reader.parse(buff, tempstr);
-				const char *temp =tempstr["ID"].asString().c_str();
-				int fd = db.get_fd(atoi(temp));
+				if(reader.parse(buff, response))
+				{
+					int fd = db.get_fd(atoi(response["ID"].asString().c_str()));
 				                   //将信息发送给相应的客户端
-				cout<<"from server  to client"<<tempstr["mesg"].asString().c_str()<<endl;
-				ret = send(fd, tempstr["mesg"].asString().c_str(), strlen(tempstr["mesg"].asString().c_str()), 0);
-				if (ret <= 0){cout<<"send error"<<endl;}
+					cout<<"from server  to client"<<response.toStyledString().c_str()<<endl;
+
+					ret = send(fd, response.toStyledString().c_str(),
+							 strlen(response.toStyledString().c_str()), 0);
+					if (ret <= 0){cout<<"send error"<<endl;}
+				}
+				else
+				{
+					cout<<"get error in reader.parse"<<endl;
+				}
 			}
 			else//客户端：数据加封，然后再进行发送
 			{
-				if(ret = recv(fd, buff, 1024, 0) <= 0)
+				if((ret = recv(fd, buff, 1024, 0)) <= 0)//运算符优先级
 					{cout<<"recv error from client"<<endl;}
 				cout<<"recv buff"<<buff<<endl;
 				int index = select_server(fd);
@@ -175,17 +167,11 @@ void* thread_func(void *)
 					deleteEvent(epollfd, fd, events);//接收失败，断掉了连接
 					continue;
 				}
-      
-				int id_num = db.get_id(fd);
-				char temp[10];
-				sprintf(temp, "%d", id_num);
-							
-				response["ID"] = temp;
-				response["mesg"] = buff;
+      			reader.parse(buff, response);
+				response["ID"] = db.get_id(fd);
 				
-				cout<<"from client to server["<<index<<"]   "<<response.asString().c_str()<<endl;
-				ret = send(serverfd[index], response.asString().c_str(), strlen(response.asString().c_str()), 0);     
-				
+				cout<<"from client to server["<<index<<"]   "<<response.toStyledString()<<endl;
+				ret = send(serverfd[index], response.toStyledString().c_str(), strlen(response.toStyledString().c_str())+1, 0);     
 				if (ret <= 0)
 				{
 					cout<<"error"<<endl;
@@ -195,7 +181,7 @@ void* thread_func(void *)
 	}	
 }
 
-int get_first(list<int> x)
+int get_first(list<int> &x)
 {	
 	if (x.empty())
 	{
