@@ -9,131 +9,9 @@ typedef enum _MsgType
     EN_MSG_ACK
 }EnMsgType;
 
-void* ReadThread(void *arg)
-{
-    CMysql db;
-    int clientfd = (int)arg;
-    while(true)
-    {//����client���͵���Ϣ����������Ӧ
-        int size = 0;
-        char recvbuf[1024]={0};
-        
-        Json::Reader reader;
-        Json::Value root;
-        Json::Value response;
-
-	size = recv(clientfd, recvbuf, 1024, 0);
-	if (size <= 0)//when a client closed,the size is 0
-        {
-            cout<<"errno:"<<errno<<endl;
-            cout<<"client connect fail!"<<endl;
-            close(clientfd);
-            return NULL;
-        }
-       cout<<"recvbuff is : "<<recvbuf<<endl;
-  		if (reader.parse(recvbuf, root))
-		{
-			cout<<"name :"<<root["name"].asString().c_str()<<endl;
-
-           	int msgtype = root["msgtype"].asInt();
-			cout<<"msgtype  is: "<<msgtype<<endl;
-
-            switch(msgtype)
-            {
-	        	response["ID"] = root["ID"].asString().c_str();//����ǩ���¼���	            
-                case EN_MSG_LOGIN:
-                {
-                    response["msgtype"] = EN_MSG_ACK;
-                    string name = root["name"].asString();
-                    if(db.queryPasswd(name.c_str(), root["pwd"].asString().c_str()))
-                    {
-                        response["ackcode"] = "ok";
-                        clientfd = db.getStates(name.c_str());
-                        //chat[name.c_str()] = clientfd;//�û���½�ɹ�֮ʱ��¼��ֵ��<name, fd>
-                        cout<<"name"<<name<<"  fd"<<clientfd<<endl;
-                    }
-                    else
-                    {
-                        response["ackcode"] = "error";
-              	    }
-                    cout<<"response:"<<response.toStyledString()<<endl;
-                    send(clientfd, response.toStyledString().c_str(),
-                        strlen(response.toStyledString().c_str())+1, 0);
-			cout<<"login send : "<<response.toStyledString().c_str()<<endl;
-                }
-                break;
-                
-                case EN_MSG_CHAT:
-                {
-                    cout<<root["from"]<<" => "<<root["to"]<<":"<<root["msg"]<<endl;    
-                   //	map<string, int>::iterator it = chat.find(root["to"].asString());
-					clientfd = db.getStates(root["to"].asString().c_str());
-					if(clientfd != -1)
-					{
-						response["msgtype"] = EN_MSG_CHAT;
-						response["from"] = root["from"].asString();
-						response["msg"] = root["msg"].asString();
-						send(clientfd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str())+1,0);
-						cout<<"chat send : "<<response.toStyledString().c_str()<<endl;
-					}
-					else
-					{
-						cout<<"should do it"<<endl;
-						//response["msgtype"] = ;
-						//response["msg"] = "error";
-						//send(sockfd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str()+1, 0));
-					}
-                }
-                break;
-
-              	case EN_MSG_REGISTER:
-				{
-					string name = root["name"].asString();
-					string passwd = root["passwd"].asString();
-					string email = root["email"].asString();
-		   		   // gUserDBMap[name] = User(name, passwd, email);
-		   		   	if (!db.insertIntoUser(name.c_str(), passwd.c_str(), email.c_str()))
-					{
-						cout<<"do it fail"<<endl;
-					}
-
-		      		response["msgtype"] = EN_MSG_ACK;
-		       		response["ackcode"] = "yes";
-					cout<<"must do it"<<endl;
-		        	send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
-				cout<<"register send :"<<response.toStyledString().c_str()<<endl;
-				}     
-	      		break;
-
-	       		case EN_MSG_OFFLINE:
-				{
-					close(clientfd);
-					cout<<"one client offlien"<<endl;
-				}
-				break;
-            }
-        }
-        //else{}
-    }
-}
-
-void ProcListenfd(evutil_socket_t fd, short , void *arg)
-{
-    sockaddr_in client;
-    socklen_t len = sizeof(client);
-    int clientfd = accept(fd, (sockaddr*)&client, &len);
-
-    cout<<"new client connect server! client info:"
-        <<inet_ntoa(client.sin_addr)<<" "<<ntohs(client.sin_port)<<endl;
- 
-    pthread_t tid;
-    pthread_create(&tid, NULL, ReadThread, (void*)clientfd);
-}
-
 int main()
 {
     int listenfd;
-
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if(listenfd == -1)
     {
@@ -158,38 +36,142 @@ int main()
         return -1;
     }
     
-    //����reactor   ͳһ�¼�Դ  socket I/O���źţ���ʱ��
     struct event_base* base = event_init();   
-    //����event�¼�
     struct event *listen_event = event_new(base, listenfd,  EV_READ|EV_PERSIST, ProcListenfd, NULL);
-    //��event�¼����ӵ�reactor��
     event_add( listen_event, NULL );
     
     cout<<"server started..."<<endl;
-    //������Ӧ��
-    event_base_dispatch(base);
-    //�ͷ��¼���Դ
-    event_free(listen_event);
-    //�ر�reactor
-    event_base_free(base);
     
+    event_base_dispatch(base);
+    event_free(listen_event);
+    event_base_free(base);
     return 0;
 }
 
-/*
-class User
+//从lb接受消息，由于一台服务器只连接一个负载均衡器，所以对数据的收和发都是对同一个fd进行的
+//1.当客户端请求的是注册时，mysql中增加user,回复的信息中将发来的fd添加
+//2.当客户端是登陆的时候，向state表中插入数据，回复信息中增加其发来的fd
+//3.当客户端是聊天的时候，查询对方是否在线，如果在线就将此包中的fd更换，将消息进行转发，
+//  --如果不在线的话就将消息存储message<message，from, to>，向发送来的fd回复提醒消息
+
+void* ReadThread(void *arg)
 {
-public:
-    User(){}
-    User(string name, string pwd, string call)
-        :_name(name), _pwd(pwd), _call(call){}
-    string getName(){return _name;}
-    string getPwd(){return _pwd;}
-private:
-    string _name;
-    string _pwd;
-    string _call;
-};
-map<string, User> gUserDBMap;
-map<string, int> chat;
-*/
+    CMysql db;
+    int clientfd = (int)arg;
+    while(true)
+    {
+        int size = 0;
+        char recvbuf[1024]={0};
+        
+        Json::Reader reader;
+        Json::Value root;
+        Json::Value response;
+        
+	size = recv(clientfd, recvbuf, 1024, 0);//server与fd的断开
+	if (size <= 0)
+        {
+            cout<<"client connect fail!"<<errno<<endl;
+            close(clientfd);
+            return NULL;
+        }
+
+      	cout<<"recvbuf is  "<<recvbuf<<endl;
+
+	if (reader.parse(recvbuf, root))
+	{
+	    int msgtype = root["msgtype"].asInt();
+			
+            switch(msgtype)
+            {	            
+                case EN_MSG_LOGIN://登陆
+                {
+                	response["msgtype"] = EN_MSG_ACK;
+                	response["FD"] = root["FD"].asInt();
+                	
+             	    string name = root["name"].asString();
+                    if(db.queryPasswd(name.c_str(), root["pwd"].asString().c_str()))
+                    {
+                        response["ackcode"] = "ok";
+        				if (!db.insertIntoStates(name.c_str(), root["FD"].asInt()))
+                        {
+	                        cout<<"insertIntoStates error"<<endl;
+                        }
+                    }
+                    else
+                    {
+                        response["ackcode"] = "error";
+              	    } 
+                    send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
+                }
+                break;
+                
+                case EN_MSG_CHAT://chat with other
+                {
+	                					
+					int tempfd = db.getStates(root["to"].asString().c_str());//error
+					cout<<"to "<<root["to"].asString().c_str()<<"  tempfd is  "<<tempfd<<endl;
+ 
+					if(tempfd != -1)//对方在线
+					{
+						response["msgtype"] = EN_MSG_CHAT;
+						response["from"] = root["from"].asString();
+						response["msg"] = root["msg"].asString();
+						response["FD"] = tempfd;
+					}
+					else
+					{
+						response["FD"] = root["FD"].asInt();
+						response["msgtype"] = EN_MSG_ACK;
+						response["ackcode"] = "sorry, he is not zaixian";	
+					}
+					send(clientfd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str())+1,0);
+                }
+                break;
+
+              	case EN_MSG_REGISTER://注册
+				{
+					string name = root["name"].asString();
+					string passwd = root["passwd"].asString();
+					string email = root["email"].asString();
+					
+		   		  	response["msgtype"] = EN_MSG_ACK;
+		       		response["FD"] = root["FD"].asInt();
+		       		
+		   		   	if (!db.insertIntoUser(name.c_str(), passwd.c_str(), email.c_str()))
+					{
+						cout<<"do it fail"<<endl;
+						response["ackcode"] = "no";
+					}
+					else
+					{
+						response["ackcode"] = "yes";
+					}
+		        	send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
+				}     
+      			break;
+      			
+	       		case EN_MSG_OFFLINE://离线
+				{
+					close(clientfd);
+					//alter_state(int fd);//在states中按照fd将此项删除
+					cout<<"server offlien"<<endl;
+				}
+				break;
+				
+            }
+        }
+    }
+}
+
+void ProcListenfd(evutil_socket_t fd, short , void *arg)
+{
+    sockaddr_in client;
+    socklen_t len = sizeof(client);
+    int clientfd = accept(fd, (sockaddr*)&client, &len);
+    cout<<"new client connect server! client info:"
+        <<inet_ntoa(client.sin_addr)<<" "<<ntohs(client.sin_port)<<endl;
+ 
+    pthread_t tid;
+    pthread_create(&tid, NULL, ReadThread, (void*)clientfd);
+}
+

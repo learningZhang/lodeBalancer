@@ -11,7 +11,7 @@ CMysql::CMysql()
 	pcon = mysql_init((MYSQL*)0);
 	if (mysql_real_connect(pcon, ip, user, passwd, NULL, port, NULL, 0) == NULL)
 	{
-		cout<<"error"<<endl;
+		cout<<"connect error"<<endl;
 		exit(-1);
     }
     
@@ -22,7 +22,7 @@ CMysql::CMysql()
 	}
 }
 
-bool CMysql::insertInto_serverfd(int fd, int id)
+bool CMysql::insertInto_serverfd(int id, int fd)
 {
 	char sql[100];
 	sprintf(sql, "insert into serverfd values('%d','%d')", id, fd);
@@ -37,43 +37,63 @@ int CMysql::get_fd(int id)
 {
 	char sql[100];
 	sprintf(sql, "select fd from serverfd where id=%d", id);
-	if (mysql_real_query(pcon, sql, strlen(sql)))
+	if (NULL == mysql_real_query(pcon, sql, strlen(sql)))
 	{
-		mysql_error(pcon);	
-		cout<<"error in getstate"<<endl;
+		cout<<"error in getstate "<<mysql_error(pcon)<<endl;
+		return -2;
 	}
 
-	pres = mysql_store_result(pcon);
-	row = mysql_fetch_row(pres);
-	for(int i=0; i<mysql_num_fields(pres); ++i)
+	if ((pres = mysql_store_result(pcon)) != NULL)//¿¿¿¿¿¿¿
 	{
-		cout<<"row is "<<row[i]<<endl;
-		int id = atoi(row[i]);
-		cout<<id;
-		return id;
+		if ((row = mysql_fetch_row(pres)) != NULL)//¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿NULL
+		{
+			int id = atoi(row[0]);
+			cout<<id;
+			mysql_free_result(pres);
+			return id;
+		}
+		if (mysql_error(pcon))//¿¿¿¿mysql_fetch_row¿¿¿¿¿¿
+		{
+			cout<<"error in get_id  "<<mysql_error(pcon)<<endl;
+		}
 	}
+	else//mysql_store_result¿¿¿¿¿¿
+	{
+		cout<<"error in get_fd "<<mysql_error(pcon)<<endl;	
+	}
+	mysql_free_result(pres);
 	return -1;
 }
+
+//int res = msyql_num_fileds(pres);¿¿¿¿¿¿¿¿¿¿
 int CMysql::get_id(int fd)
 {
 	char sql[100];
 	sprintf(sql, "select id from serverfd where fd=%d ", fd);
 	if (mysql_real_query(pcon, sql, strlen(sql)))
 	{
-		mysql_error(pcon);
-		cout<<"error in getstate"<<endl;
+		cout<<"error in getstate"<<mysql_error(pcon)<<endl;//¿¿¿¿
+		return -2;
 	}
 
-	pres = mysql_store_result(pcon);
-	row = mysql_fetch_row(pres);
-	
-	for(int i=0; i<mysql_num_fields(pres); ++i)
+	if ((pres = mysql_store_result(pcon)) != NULL)
 	{
-		cout<<"row is "<<row[i]<<endl;
-		int fd = atoi(row[i]);
-		cout<<"fd is"<<fd<<endl;
-		return fd;
+		if ((row = mysql_fetch_row(pres)) != NULL)//¿¿¿¿¿¿
+		{
+			int fd = atoi(row[0]);//¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿
+			cout<<"fd is"<<fd<<endl;
+			return fd;
+		}
+		if (mysql_error(pcon) != NULL)
+		{
+			cout<<"error "<<mysql_error(pcon)<<endl;	
+		}
 	}
+	else
+	{
+		cout<<"in get_id "<<mysql_error(pcon);
+	}
+	mysql_free_result(pres);
 	return -1;	
 }
 
@@ -93,19 +113,28 @@ bool CMysql::queryPasswd(const char *name, const char *passwd)
 {
 	char sql[100];
 	sprintf(sql, "select name, pwd from user where name='%s'", name);
-	mysql_real_query(pcon, sql, strlen(sql));
-	pres = mysql_store_result(pcon);//½«½á¹û±£´æÓÚpresÖÐ
-
-	while(row = mysql_fetch_row(pres))//array or false
+	if (mysql_real_query(pcon, sql, strlen(sql)))
 	{
-		for(int i=0; i<mysql_num_fields(pres); ++i)
+		cout<<mysql_error(pcon)<<endl;
+		return -2;
+	}
+	
+	if ((pres = mysql_store_result(pcon)) != NULL)//½«½á¹û±£´æÓÚpresÖÐ
+	{
+		if ((row = mysql_fetch_row(pres)) != NULL)//array or false
 		{
-			if(strcmp(row[1],passwd)==0)
+			if( strcmp(row[1],passwd) == 0 )
 			{
+				mysql_free_result(pres);
 				return true;
 			}
 		}
+		if (mysql_error(pcon) != NULL)
+		{
+			cout<<mysql_error(pcon)<<endl;	
+		}
 	}
+	mysql_free_result(pres);
 	return false;
 }
 
@@ -124,22 +153,33 @@ bool CMysql::deleteUser(const char *name)
 int CMysql::getStates(const char *name)
 {
 	char sql[100];
-	memset(sql, 0, 100);
 	sprintf(sql, "select socket from state where name='%s'", name);
 	if (mysql_real_query(pcon, sql, strlen(sql)))
 	{
-		mysql_error(pcon);	
-		cout<<"error in getstate"<<endl;
+		cout<<"error in getstate "<<mysql_error(pcon)<<endl;
+		return -2;
 	}
-
-	pres = mysql_store_result(pcon);
-	row = mysql_fetch_row(pres);
-	for(int i=0; i<mysql_num_fields(pres); ++i)
+        
+	if ((pres = mysql_store_result(pcon)) != NULL)//¿¿¿¿¿¿¿¿¿¿¿1.¿¿¿¿¿¿¿¿¿¿¿¿ 2.¿¿¿¿¿¿¿¿¿¿¿¿¿ 3.¿¿¿¿¿¿¿
 	{
-		int fd = 0;
-	 	fd = atoi(row[i]);
-		return fd;
+		if ((row = mysql_fetch_row(pres)) != NULL)//¿¿¿¿¿¿¿¿
+		{
+			int re = atoi(row[0]);
+			mysql_free_result(pres);
+			return re;
+		}
+
+		if (mysql_error(pcon) != NULL)
+		{
+			cout<<"error in getstates "<<mysql_error(pcon)<<endl;
+		}
 	}
+	else
+	{
+		cout<<"error in getStates "<<mysql_error(pcon)<<endl;
+		return -1; 
+	}
+	mysql_free_result(pres);
 	return -1;
 }
 

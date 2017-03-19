@@ -1,19 +1,5 @@
-#include <iostream>
-using namespace std;
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <assert.h>
-#include <stdio.h>
-#include <signal.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <event.h>
-#include <json/json.h>
+#include "head.h"
+
 
 typedef enum _MsgType
 {
@@ -24,168 +10,14 @@ typedef enum _MsgType
     EN_MSG_ACK
 }EnMsgType;
 
-//»´æ÷º«¬º”√ªß√˚∫Õ√‹¬Î
 char name[20];
 char pwd[20];
 
-
-//“Ï≤ΩΩ” ’∂¡œﬂ≥Ã
-void* ReadThread(void *arg)
-{
-    int clientfd = *(int*)arg;
-    char recvbuf[1024];
-    Json::Reader reader;
-    Json::Value root;
-    int size=0;
-
-    while(true)
-    {
-        size = recv(clientfd, recvbuf, 1024, 0);
-        if(size < 0)
-        {
-            cout<<"server connect fail!"<<endl;
-            break;
-        }
-        if(reader.parse(recvbuf, root))
-        {
-            int msgtype = root["msgtype"].asInt();
-            switch(msgtype)
-            {
-                case EN_MSG_CHAT:
-                {
-                    cout<<root["from"].asString()<<":"<<root["msg"]<<endl;
-                }
-                break;
-                case EN_MSG_ACK:
-	            {
-		            cout<<root["ackcode"].asString()<<endl;
-	            }
-	            break;
-            }
-        }
-    }
-}
-
-bool registe(int fd)//◊¢≤·
-{
-	char email[20];
-	char passwd[20];
-	cout<<"your name: ";
-	cin.getline(name, 20);
-	cout<<"input passwd: ";
-	cin.getline(passwd, 20);
-	cout<<"your emial: ";
-	cin.getline(email, 20);
-	
-	Json::Value root;
-	root["msgtype"] = EN_MSG_REGISTER;
-	root["name"] = name;
-	root["passwd"] = passwd;
-	root["email"] = email;
- 	char recvbuf[1024];
-	int size = send(fd, root.toStyledString().c_str(),
-	 	strlen(root.toStyledString().c_str()), 0);
-	if (size < 0)
-	{
-		cout<<"register info send fail"<<endl;
-		exit(0);
-	}
-
-	char recvbuff[1024];
-	size = recv(fd, recvbuf, 1024, 0);
-	if (size < 0)
-	{
-		cout<<"register info ack fail"<<endl;
-	}
-	 //ºÏ≤È∑µªÿ–≈œ¢»Áπ˚’˝»∑æÕÕÀµΩµ«¬ΩΩÁ√Ê
-	Json::Reader reader;
-	if(reader.parse(recvbuf, root))
-	{
-        	int msgtype = root["msgtype"].asInt();
-       		if(msgtype != EN_MSG_ACK)
-        	{
-            		cout<<"recv server login ack msg invalid!"<<endl;
-            		exit(0);
-        	}
-       		 string ackcode = root["ackcode"].asString();
-        	if(ackcode == "yes")
-        	{
-            		return true;
-        	}
-       		return false;
-    }
-    return false;
-}
-
-bool doLogin(int fd)//µ«¬Ω
-{
-    cout<<"name:";
-    cin.getline(name, 20);
-    cout<<"pwd:";
-    cin.getline(pwd, 20);
-    
-    Json::Value root;
-    root["msgtype"] = EN_MSG_LOGIN;
-    root["name"] = name;
-    root["pwd"] = pwd;
-
-    cout<<"my fd is"<<fd<<endl;    
-    int size = send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str())+1, 0);
-    if(size < 0)
-    {
-        cout<<"send login msg fail!"<<endl;
-        exit(0);
-    }
-    
-    char recvbuf[1024]={0};
-    size = recv(fd, recvbuf, 1024, 0);
-    if(size <= 0)
-    {
-        cout<<"recv server login ack fail!"<<endl;
-        exit(0);
-    }
-    
-    Json::Reader reader;
-    if(reader.parse(recvbuf, root))
-    {
-        int msgtype = root["msgtype"].asInt();
-        if(msgtype != EN_MSG_ACK)
-        {
-            cout<<"recv server login ack msg invalid!"<<endl;
-            exit(0);
-        }
-        string ackcode = root["ackcode"].asString();
-        if(ackcode == "ok")
-        {
-            return true;
-        }
-        return false;
-    }
-    return false;
-}
-
-bool offline(int fd)
-{
-	Json::Value  root;
-	root["msgtype"] = EN_MSG_OFFLINE;
-	int size = send(fd, root.toStyledString().c_str(), 
-			strlen(root.toStyledString().c_str()), 0);
-	if (size < 0)
-	{
-		return false;
-	}
-	else
-	{
-		return true;
-	}
-}
-
-// √¸¡Ó––≤Œ ˝¥´»Î∑˛ŒÒ∆˜port
 int main(int argc, char **argv)
 {
-
     int port=10001;
     int clientfd;
+    
     clientfd = socket(AF_INET, SOCK_STREAM, 0);
     if(clientfd == -1)
     {
@@ -204,40 +36,63 @@ int main(int argc, char **argv)
         cout<<"connect server fail!"<<endl;
         return -1;
     }
-   cout<<"connect over"<<endl;
+    
     int choice = 0;
     bool bloginsuccess = false;
-    while(!bloginsuccess)
+    
+    while (!bloginsuccess)
     {
         cout<<"============"<<endl;
         cout<<"1.login"<<endl;
         cout<<"2.register"<<endl;
         cout<<"3.exit"<<endl;
-        cout<<"============"<<endl;   //“Ï≥£ÕÀ≥ˆ-–≈∫≈
+        cout<<"============"<<endl;   //ÂºÇÂ∏∏ÈÄÄÂá∫-‰ø°Âè∑
+        
         cout<<"choice:";
         cin>>choice;
 	cin.get();
+		
         switch(choice)
         {
-            case 1://login
-            	if(doLogin(clientfd))    { bloginsuccess = true;}  
-            	else{cout<<"login fail!name or pwd is wrong!"<<endl;}  
+            case 1:
+	        {
+            	if(doLogin(clientfd))    
+            	{
+	            	bloginsuccess = true;
+	            }  
+            	else
+            	{
+	            	cout<<"login fail!"<<endl;
+	            }  
             	break;
-            
+        	}
+           
             case 2:
-           	 if (registe(clientfd))    {cout<<"register successful!"<<endl;}
-           	 else {cout<<"register failed!"<<endl;}
-		 continue;
+	        {
+           		if (registe(clientfd))    
+           		{
+	         	  	cout<<"register successful!"<<endl;
+	    		}
+           		else 
+           		{
+	          	 	cout<<"register failed!"<<endl;
+	       		}
+		 		continue;
+		 	}
+		 	
             case 3:
-		offline(clientfd);
-		close(clientfd);
-	        cout<<"bye bye..."<<endl;
-		exit(0);
+	        {
+				offline(clientfd);
+				close(clientfd);
+	        	cout<<"bye bye..."<<endl;
+	        	exit(0);
+	        }
+	        
             default:
+	        {
                 cout<<"invalid input!"<<endl;
-		fflush(stdin);
-		memset(&choice, 0 ,sizeof(int));
-		continue;
+				continue;
+			}
         }
     }
     cout<<"welcome to chat system!"<<endl;
@@ -254,8 +109,8 @@ int main(int argc, char **argv)
         {
 	        offline(clientfd);
 	        cout<<"by close to shutdown client"<<endl;
-		close(clientfd);
-                exit(0);
+			close(clientfd);
+            exit(0);
         }
         
         string parsestr = chatbuf;
@@ -268,4 +123,139 @@ int main(int argc, char **argv)
         size = send(clientfd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str())+1, 0);
     }
     return 0;
+}
+
+void* ReadThread(void *arg)
+{
+    int clientfd = *(int*)arg;
+    char recvbuf[1024];
+    Json::Reader reader;
+    Json::Value root;
+
+    while(true)
+    {
+        if(recv(clientfd, recvbuf, 1024, 0) <= 0)
+        {
+            cout<<"server connect fail!"<<endl;
+	    return 0;//can reconnnet the server??
+            break;
+        }
+        if(reader.parse(recvbuf, root))
+        {
+            switch(root["msgtype"].asInt())
+            {
+                case EN_MSG_CHAT:
+                {
+                    cout<<"recv is  "<<root["from"].asString()<<":"<<root["msg"]<<endl;
+                }
+                break;
+                case EN_MSG_ACK:
+	            {
+		            cout<<root["ackcode"].asString()<<endl;
+	            }
+	            break;
+            }
+        }
+    }
+}
+
+
+bool registe(int fd)
+{
+	char name[20];
+	char email[20];
+	char passwd[20];
+	char recvbuf[1024];
+	
+	cout<<"your name: ";
+	cin.getline(name, 20);
+	cout<<"input passwd: ";
+	cin.getline(passwd, 20);
+	cout<<"your emial: ";
+	cin.getline(email, 20);
+	
+	Json::Value root;
+	root["msgtype"] = EN_MSG_REGISTER;
+	root["name"] = name;
+	root["passwd"] = passwd;
+	root["email"] = email;
+
+	int size = send(fd, root.toStyledString().c_str(),strlen(root.toStyledString().c_str()), 0);
+	if (size <= 0)
+	{
+		cout<<"register info send fail"<<endl;
+		exit(0);
+	}
+
+	size = recv(fd, recvbuf, 1024, 0);
+	if (size <= 0)
+	{
+		cout<<"register info ack fail"<<endl;
+		return false;
+	}
+
+	cout<<"recv buff "<<recvbuf<<endl;
+
+	Json::Reader reader;
+	if(reader.parse(recvbuf, root))
+	{
+        int msgtype = root["msgtype"].asInt();
+       	if(msgtype != EN_MSG_ACK)
+        {
+            	cout<<"recv server login ack msg invalid!"<<endl;
+            	exit(0);
+        }
+       	string ackcode = root["ackcode"].asString();
+        if(ackcode == "yes")
+        {
+           		return true;
+        }
+    }
+    return false;
+}
+
+
+bool doLogin(int fd)
+{
+    cout<<"name:";
+    cin.getline(name, 20);
+    cout<<"pwd:";
+    cin.getline(pwd, 20);
+    
+    Json::Value root;
+    root["msgtype"] = EN_MSG_LOGIN;
+    root["name"] = name;
+    root["pwd"] = pwd;
+  
+    send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str())+1, 0);
+    char recvbuf[1024]={0};
+    
+    if(recv(fd, recvbuf, 1024, 0) <= 0)
+    {
+        cout<<"recv server login ack fail!"<<endl;
+        exit(0);
+    }
+    cout<<"recv buff is "<<recvbuf<<endl;
+   
+    Json::Reader reader;
+    if(reader.parse(recvbuf, root))
+    {
+        if(root["msgtype"].asInt() != EN_MSG_ACK)
+        {
+            cout<<"recv server login ack msg invalid!"<<endl;
+            exit(0);
+        }
+        if(root["ackcode"].asString() == "ok")
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool offline(int fd)//‰∏ªÂä®ÊâìÊãõÂëºÊñ≠ÂºÄËøòÊòØÁõ¥Êé•Êñ≠ÂºÄ--„ÄãÊúçÂä°Âô®ÁöÑËµÑÊ∫ê
+{
+	Json::Value  root;
+	root["msgtype"] = EN_MSG_OFFLINE;
+	send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str()), 0);
 }

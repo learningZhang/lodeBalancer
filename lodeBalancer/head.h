@@ -38,9 +38,9 @@ class CMysql
 	 	MYSQL_RES *pres;
 		MYSQL_ROW row;
 		
-		char *ip;
-		char *user;
-		char *passwd;
+	 	const char *ip;
+		const char *user;
+		const char *passwd;
 		unsigned short port;
 };
 
@@ -63,3 +63,15 @@ int select_server(int fd);
 int deleteEvent(int epfd,int fd, struct epoll_event *event);
 
 int addEvent(int epfd, int fd);
+
+void ProcListenfd(evutil_socket_t fd, short , void *arg);
+
+void* ReadThread(void *arg);
+
+bool registe(int fd);
+
+void* ReadThread(void *arg);
+
+bool doLogin(int fd);
+
+bool offline(int fd);//主动打招呼断开还是直接断开--》服务器的资源
