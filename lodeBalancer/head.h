@@ -34,6 +34,7 @@ class CMysql
 		int  get_fd(int id);
 		int  get_id(int fd);
 		int deleteFromStates(char *name);
+		//
 	private:
 		MYSQL *pcon;
 	 	MYSQL_RES *pres;
