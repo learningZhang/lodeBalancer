@@ -1,15 +1,5 @@
 #include "head.h"
 
-
-typedef enum _MsgType
-{
-    EN_MSG_LOGIN=1,
-    EN_MSG_REGISTER,
-    EN_MSG_CHAT,
-    EN_MSG_OFFLINE,
-    EN_MSG_ACK
-}EnMsgType;
-
 char name[20];
 char pwd[20];
 
@@ -49,9 +39,9 @@ int main(int argc, char **argv)
         cout<<"============"<<endl;   //异常退出-信号
         
         cout<<"choice:";
-        cin>>choice;
-	cin.get();
-		
+        choice = fgetc(stdin)-'0';//一次取出一个字符
+        fflush(stdin);
+	
         switch(choice)
         {
             case 1:
@@ -95,6 +85,7 @@ int main(int argc, char **argv)
 			}
         }
     }
+    
     cout<<"welcome to chat system!"<<endl;
     pthread_t tid;
     pthread_create(&tid, NULL, ReadThread, &clientfd);
@@ -137,8 +128,7 @@ void* ReadThread(void *arg)
         if(recv(clientfd, recvbuf, 1024, 0) <= 0)
         {
             cout<<"server connect fail!"<<endl;
-	    return 0;//can reconnnet the server??
-            break;
+	    	return 0;//can reconnnet the server??//连接失败直接退出
         }
         if(reader.parse(recvbuf, root))
         {
@@ -259,3 +249,12 @@ bool offline(int fd)//主动打招呼断开还是直接断开--》服务器的�
 	root["msgtype"] = EN_MSG_OFFLINE;
 	send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str()), 0);
 }
+
+//1.密码加密   密钥+明文
+//将密钥存放在客户机中，输入信息之后，和密钥进行加密，将加密后的字符发送给服务器，然后由
+//服务器进行匹配
+
+//2.长连接，短链接
+//3.群聊功能
+//4.突发事件的处理
+//5.留言功能的实现

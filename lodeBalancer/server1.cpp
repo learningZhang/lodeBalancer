@@ -1,14 +1,5 @@
 #include "head.h"
 
-typedef enum _MsgType
-{
-    EN_MSG_LOGIN=1,
-    EN_MSG_REGISTER,
-    EN_MSG_CHAT,
-    EN_MSG_OFFLINE,
-    EN_MSG_ACK
-}EnMsgType;
-
 int main()
 {
     int listenfd;
@@ -56,24 +47,26 @@ void* ReadThread(void *arg)
     {
         int size = 0;
         char recvbuf[1024]={0};
-        
+                
         Json::Reader reader;
         Json::Value root;
         Json::Value response;
         
-	size = recv(clientfd, recvbuf, 1024, 0);//server与fd的断开
-	if (size <= 0)
-        {
-            cout<<"client connect fail!"<<errno<<endl;
-            close(clientfd);
-            return NULL;
-        }
+		size = recv(clientfd, recvbuf, 1024, 0);//server与lb的断开
+		if (size <= 0)
+    	{
+	    	//将此server移除出去，然后从将states中的fd进行重新的分配
+	    	//一个进程中，多个线程，之间的文件描述符是共享的，所以可以相互交换
+	    	//// int re_arrage();//
+        	cout<<"client connect fail!"<<errno<<endl;
+        	close(clientfd);
+        	return NULL;
+    	}
 
-      	cout<<"recvbuf is  "<<recvbuf<<endl;
-
-	if (reader.parse(recvbuf, root))
-	{
-	    int msgtype = root["msgtype"].asInt();
+  		cout<<"recvbuf is  "<<recvbuf<<endl;
+		if (reader.parse(recvbuf, root))
+		{
+	    	int msgtype = root["msgtype"].asInt();
 			
             switch(msgtype)
             {	            
@@ -96,12 +89,12 @@ void* ReadThread(void *arg)
                         response["ackcode"] = "error";
               	    } 
                     send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
+					sendMesgFromDb(root["name"].asString.c_str(), clientfd);//发送留言信息
                 }
                 break;
                 
                 case EN_MSG_CHAT://chat with other
-                {
-	                					
+                {	
 					int tempfd = db.getStates(root["to"].asString().c_str());//error
 					cout<<"to "<<root["to"].asString().c_str()<<"  tempfd is  "<<tempfd<<endl;
  
@@ -114,6 +107,9 @@ void* ReadThread(void *arg)
 					}
 					else
 					{
+						insertIntoMessage(root["from"].asString().c_str(), 
+								root["to"].asString().c_str(),root["msg"].asString().c_str());//留言信息存储	
+							//磁盘上操作太慢，将其加入到epoll,如何添加
 						response["FD"] = root["FD"].asInt();
 						response["msgtype"] = EN_MSG_ACK;
 						response["ackcode"] = "sorry, he is not zaixian";	
@@ -146,8 +142,8 @@ void* ReadThread(void *arg)
       			
 	       		case EN_MSG_OFFLINE://离线
 				{
-					close(clientfd);
-					//alter_state(int fd);//在states中按照fd将此项删除
+					close(clientfd);		
+					delStateByfd(db, clientfd);//bool alter_state(int fd);//在states中按照fd将此项删除
 					cout<<"server offlien"<<endl;
 				}
 				break;
@@ -169,3 +165,38 @@ void ProcListenfd(evutil_socket_t fd, short , void *arg)
     pthread_create(&tid, NULL, ReadThread, (void*)clientfd);
 }
 
+//bool delInMessage(cosnt char *name);
+//char * findMesgByName(const char*name);
+
+void sendMesgFromDb(const char*name, int fd)//寻找，怎么进行触发，登陆时候
+{
+	Json::Value response;
+	const char *buff;
+	if ((buff == findMesgByName(name)) == NULL)//得到字符串，在db中对字符串进行包装，再解封
+	{
+		return ;
+	}
+	else
+	{
+		const char *temp = ",";
+
+		char *fd = strtok(buff, temp);
+		char *msg = strtok(buff, temp);
+		char *from =strtok(buff, temp);
+	
+		response["FD"] = fd;
+		response["msgtype"] = EN_MSG_ACK;
+		response["msg"] = buff;
+		response["from"] = from;
+
+		int x = send(fd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str()), 0);
+		if (x<0)
+		{
+			return ;
+		}
+		else
+		{
+			delInMessage(name);//发送成功就将其从数据库中删除
+		}
+	}
+}

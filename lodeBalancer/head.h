@@ -21,31 +21,16 @@ using namespace std;
 #include <mysql/mysql.h>
 #include <list>
 
-class CMysql
+typedef enum _MsgType
 {
-	public:
-		CMysql();
-		bool insertIntoUser(const char *name, const char *passwd, const char *call);
-		bool queryPasswd(const char *name, const char *passwd);
-		bool deleteUser(const char *name);
-		int getStates(const char *name);
-		bool insertIntoStates(const char *name, int fd);
-		bool insertInto_serverfd(int fd, int id);
-		int  get_fd(int id);
-		int  get_id(int fd);
-		int deleteFromStates(char *name);
-	private:
-		MYSQL *pcon;
-	 	MYSQL_RES *pres;
-		MYSQL_ROW row;
-		
-	 	const char *ip;
-		const char *user;
-		const char *passwd;
-		unsigned short port;
-};
+    EN_MSG_LOGIN=1,
+    EN_MSG_REGISTER,
+    EN_MSG_CHAT,
+    EN_MSG_OFFLINE,
+    EN_MSG_ACK
+}EnMsgType;
 
-int get_first(list<int> &x);
+class CMysql;
 
 void Listenfd(evutil_socket_t fd, short int, void *arg);
 
@@ -76,3 +61,7 @@ void* ReadThread(void *arg);
 bool doLogin(int fd);
 
 bool offline(int fd);//主动打招呼断开还是直接断开--》服务器的资源
+
+void insert_clifd_serfd(int clientfd, int serverfd);
+
+int search_cli_to_ser_fd(int fd);
