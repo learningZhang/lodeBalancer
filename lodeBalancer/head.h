@@ -76,4 +76,6 @@ void* ReadThread(void *arg);
 
 bool doLogin(int fd);
 
-bool offline(int fd);//Ö÷¶¯´òÕĞºô¶Ï¿ª»¹ÊÇÖ±½Ó¶Ï¿ª--¡··şÎñÆ÷µÄ×ÊÔ´
+bool offline(int fd);//ä¸»åŠ¨æ‰“æ‹›å‘¼æ–­å¼€è¿˜æ˜¯ç›´æ¥æ–­å¼€--ã€‹æœåŠ¡å™¨çš„èµ„æº
+
+//test the git
