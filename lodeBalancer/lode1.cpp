@@ -1,3 +1,4 @@
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 <<<<<<< Updated upstream:lodeBalancer/lodeBalancer.cpp
 #include"head.h"
 
@@ -299,6 +300,18 @@ void insert_clifd_serfd(int clientfd, int serverfd)//将客户端来的作为主
 #include"head.h"
 int serverfd[FD_NUM]={0};//服务器的fd
 int ppfd[2]={0};
+=======
+#include"head.h"
+
+#define THREAD_NUM 3
+#define MAX 50 //单线程中一个epoll最多可以接受的文件描述符
+
+#define FD_NUM 3
+int serverfd[FD_NUM];//服务器的fd
+int ppfd[2];
+
+extern map<int, int> ser_to_cli;
+>>>>>>> dev:lodeBalancer/lode1.cpp
 
 int main()
 {
@@ -327,6 +340,10 @@ int main()
 	server_start();
     assert(pipe(ppfd) != -1);
 	pthread_pool();
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
+=======
+	//create_pthread_for_message();
+>>>>>>> dev:lodeBalancer/lode1.cpp
 
  	struct event_base *base = event_init();
 	struct event *listen_event = event_new(base, sockfd, EV_READ|EV_PERSIST, Listenfd, NULL);    	event_add( listen_event, NULL );
@@ -339,10 +356,19 @@ int main()
    	return 0;
 }
 
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 void* thread_func(void *)
 {	
 	int epollfd =  epoll_create(MAX);
 	struct epoll_event events[MAX];       //创建一个数组，用于接受传递回来的事件值
+=======
+
+void* thread_func(void *)
+{
+	CMysql db;
+	int epollfd =  epoll_create(MAX);
+	struct epoll_event events[MAX];       
+>>>>>>> dev:lodeBalancer/lode1.cpp
 	
 	addEvent(epollfd, ppfd[0]);
 
@@ -362,12 +388,17 @@ void* thread_func(void *)
 	while (true)
 	{
 		if ((res = epoll_wait(epollfd, events, MAX, -1)) == -1)
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 		{        ///传递进去events数组,MAX为数组的长度，然后进行监听，MAX表示一次监听最大的文件描述符的个数
+=======
+		{        
+>>>>>>> dev:lodeBalancer/lode1.cpp
 			if (errno != EINTR)
 			{
 				return NULL;
 			}
 		}
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 		//两种情况，一个是客户端和lb断开联系，一个是服务器与lb断开联系，
 		//客户端与lb断开来连接，将客户端的信息清除，从epoll中删除该客户端的fd,让客户端重新连接
 		//lb与服务器断开连接，lb中是epoll结构，而服务器中是多线程，是一个断开连接
@@ -383,6 +414,9 @@ void* thread_func(void *)
 
 		int delEvent[100];
 		int f = 0;
+=======
+
+>>>>>>> dev:lodeBalancer/lode1.cpp
 		int pfd = 0;		
 		for (int i=0; i<res; ++i)
 		{			
@@ -399,6 +433,7 @@ void* thread_func(void *)
 				cout<<"pipe buff is "<<pipebuff<<endl;
 			}
 			else if (judge(fd))
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 			{		//服务器---lb
 				ret = recv(fd, buff, 1024, 0);
 				cout<<"recv from server "<<buff<<endl;
@@ -420,6 +455,17 @@ void* thread_func(void *)
 				{
 					cout<<"recv error"<<endl;
 					continue;
+=======
+			{				
+				ret = recv(fd, buff, 1024, 0);
+				cout<<"recv from server "<<buff<<endl;
+				if (ret <= 0)//与服务器断开了联系,如何善后,有存储的<客户端，服务器>,将其进行重新分配
+				{					
+					cout<<"server down"<<endl;
+					deleteEvent(epollfd, fd, events);//int new_given();
+					//continue;
+					break;
+>>>>>>> dev:lodeBalancer/lode1.cpp
 				}
 
 				if (reader.parse(buff, root))
@@ -432,6 +478,7 @@ void* thread_func(void *)
 					}   
 				}
 			}
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 			else//客户端和lb断开了连接
 			{		
 				int serfd = 0;  	
@@ -440,12 +487,24 @@ void* thread_func(void *)
 				{
 					cout<<"with client break out"<<endl;
 					serfd = search_cli_to_ser_fd(fd);//建立和一致性哈希就可以根据键来找到对应的服务器fd
+=======
+			else//信息来自客户端
+			{		  
+				int serfd = 0;  	
+				ret = recv(fd, buff, 1024, 0);
+				if (ret <= 0)
+				{
+					cout<<"server down"<<endl;
+					serfd = search_cli_to_ser_fd(fd);
+					
+>>>>>>> dev:lodeBalancer/lode1.cpp
 					if (serfd  == -1)//对方还没有获得处理其的服务器
 					{
 						cout<<"a client over and dont have serverfd"<<endl;
 					}
 					else
 					{
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 						response["FD"] = fd;//向服务器报信
 						response["msgtype"] = offline;
 						send(serfd, response.toStyledString().c_str(), 
@@ -458,28 +517,51 @@ void* thread_func(void *)
 				{
 					cout<<"recv error"<<endl;
 					cout<<"errno is :"<<errno<<endl;
+=======
+						response["FD"] = fd;
+						response["msgtype"] = offline;
+					
+						send(serfd, response.toStyledString().c_str(), 
+						  strlen(response.toStyledString().c_str())+1, 0);//告诉server去修改state表中的用户状态
+					}
+					
+					deleteEvent(epollfd, fd, events);//接收失败，断掉了连接
+>>>>>>> dev:lodeBalancer/lode1.cpp
 					continue;
 				}
 
 				cout<<"recv from client"<<buff<<endl;
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
+=======
+
+>>>>>>> dev:lodeBalancer/lode1.cpp
 				if(reader.parse(buff, response))
 				{
 					serfd = search_cli_to_ser_fd(fd);
 					if (serfd == -1)
 					{
 						int index = select_server(fd);//选择服务器
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 						insert_clifd_serfd(fd, serverfd[index]);//一致性哈希替换
+=======
+						insert_clifd_serfd(fd, serverfd[index]);
+>>>>>>> dev:lodeBalancer/lode1.cpp
 						serfd = serverfd[index];
 					}
 					response["FD"] = fd;
 					ret = send(serfd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str())+1, 0);     
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 					if (ret == -1)
+=======
+					if (ret <= 0)
+>>>>>>> dev:lodeBalancer/lode1.cpp
 					{
 						cout<<"error"<<endl;
 					}   
 				}              
 			}	
 		}
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 		if (f != 0)
 		{
 			for (int i=0; i<f; ++i)
@@ -487,12 +569,18 @@ void* thread_func(void *)
 				deleteEvent(epollfd, delEvent[i], events);
 			}		
 		}
+=======
+>>>>>>> dev:lodeBalancer/lode1.cpp
 	}	
 }
 
 
 void Listenfd(evutil_socket_t fd, short int , void *arg)//主线程
 {
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
+=======
+	CMysql db;
+>>>>>>> dev:lodeBalancer/lode1.cpp
     sockaddr_in client;
     socklen_t len = sizeof(client);
     int clientfd = accept(fd, (sockaddr*)&client, &len);
@@ -522,8 +610,11 @@ void Listenfd(evutil_socket_t fd, short int , void *arg)//主线程
 
 //如何知道这个客户端去了哪一个服务器，一个客户端只能并且一直连接一台服务器
 //添加表，用来记录服务器和客户端的对应关系
+<<<<<<< HEAD:lodeBalancer/lodeBalancer.cpp
 
 
 //一个服务器与lb之间的连接只有一个，当期之间发生断开连接的时候lb要将该服务器所连接
 //至其上的所有客户端重新分配
 >>>>>>> Stashed changes:lodeBalancer/lode1.cpp
+=======
+>>>>>>> dev:lodeBalancer/lode1.cpp

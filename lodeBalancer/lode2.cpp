@@ -1,8 +1,13 @@
 //for file lode1
 #include "head.h"
+<<<<<<< HEAD
 extern int serverfd[FD_NUM];
 extern int ppfd[2];
 map<int, int> ser_to_cli;
+=======
+
+extern map<int, int> ser_to_cli;
+>>>>>>> dev
 
 void server_start()//向第index的服务器发送数据
 {
@@ -50,12 +55,17 @@ void pthread_pool()
 	}
 }
 
+<<<<<<< HEAD
 bool judge(int fd)
+=======
+bool judge(int fd)//来自客户端就返回假
+>>>>>>> dev
 {
 	for(int i=0; i<FD_NUM; ++i)
 	{
 		if(serverfd[i] == fd)
 		{
+<<<<<<< HEAD
 			return true;//fd是服务器
 		}
 	}
@@ -64,6 +74,15 @@ bool judge(int fd)
 
 static int tag = 0;
 
+=======
+			return true;
+		}
+	}
+	return false;
+}
+
+static int tag = 0;
+>>>>>>> dev
 int select_server(int fd)
 {
 	return tag = (tag+1)%3;
@@ -71,7 +90,11 @@ int select_server(int fd)
 
 int deleteEvent(int epfd,int fd, struct epoll_event *event)
 {
+<<<<<<< HEAD
 	epoll_ctl(epfd, EPOLL_CTL_DEL, fd, event);
+=======
+	epoll_ctl(epfd, EPOLL_CTL_MOD, fd, event);
+>>>>>>> dev
 }
 
 int setnomblocking(int fd)

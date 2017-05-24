@@ -5,15 +5,6 @@
 
 //数据库中CMysql对象的定义如何使得公用一个
 
-typedef enum _MsgType
-{
-    EN_MSG_LOGIN=1,
-    EN_MSG_REGISTER,
-    EN_MSG_CHAT,
-    EN_MSG_OFFLINE,
-    EN_MSG_ACK
-}EnMsgType;
-
 int main()
 {
     int listenfd;
@@ -83,25 +74,27 @@ void* ReadThread(void *arg)
     {
         int size = 0;
         char recvbuf[1024]={0};
-        
+                
         Json::Reader reader;
         Json::Value root;
         Json::Value response;
 <<<<<<< Updated upstream:lodeBalancer/chatserver.cpp
         
-	size = recv(clientfd, recvbuf, 1024, 0);//server与fd的断开
-	if (size <= 0)
-        {
-            cout<<"client connect fail!"<<errno<<endl;
-            close(clientfd);
-            return NULL;
-        }
+		size = recv(clientfd, recvbuf, 1024, 0);//server与lb的断开
+		if (size <= 0)
+    	{
+	    	//将此server移除出去，然后从将states中的fd进行重新的分配
+	    	//一个进程中，多个线程，之间的文件描述符是共享的，所以可以相互交换
+	    	//// int re_arrage();//
+        	cout<<"client connect fail!"<<errno<<endl;
+        	close(clientfd);
+        	return NULL;
+    	}
 
-      	cout<<"recvbuf is  "<<recvbuf<<endl;
-
-	if (reader.parse(recvbuf, root))
-	{
-	    int msgtype = root["msgtype"].asInt();
+  		cout<<"recvbuf is  "<<recvbuf<<endl;
+		if (reader.parse(recvbuf, root))
+		{
+	    	int msgtype = root["msgtype"].asInt();
 			
 =======
 
@@ -153,6 +146,7 @@ void* ReadThread(void *arg)
               	    } 
 <<<<<<< Updated upstream:lodeBalancer/chatserver.cpp
                     send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
+<<<<<<< HEAD:lodeBalancer/chatserver.cpp
 =======
                     size = send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
 					if (size == -1)
@@ -167,12 +161,14 @@ void* ReadThread(void *arg)
 							cout<<"del sended message error"<<endl;
 					}
 >>>>>>> Stashed changes:lodeBalancer/server1.cpp
+=======
+					sendMesgFromDb(root["name"].asString.c_str(), clientfd);//发送留言信息
+>>>>>>> dev:lodeBalancer/server1.cpp
                 }
                 break;
                 
                 case EN_MSG_CHAT://chat with other
-                {
-	                					
+                {	
 					int tempfd = db.getStates(root["to"].asString().c_str());//error
 					cout<<"to "<<root["to"].asString().c_str()<<"  tempfd is  "<<tempfd<<endl;
  
@@ -185,12 +181,18 @@ void* ReadThread(void *arg)
 					}
 					else
 					{
+<<<<<<< HEAD:lodeBalancer/chatserver.cpp
 <<<<<<< Updated upstream:lodeBalancer/chatserver.cpp
 =======
 						insertIntoMessage(root["from"].asString().c_str(), 
 								root["to"].asString().c_str(),root["msg"].asString().c_str(), db);//留言信息存储	
 							//磁盘上操作太慢，将其加入到epoll,如何添加
 >>>>>>> Stashed changes:lodeBalancer/server1.cpp
+=======
+						insertIntoMessage(root["from"].asString().c_str(), 
+								root["to"].asString().c_str(),root["msg"].asString().c_str());//留言信息存储	
+							//磁盘上操作太慢，将其加入到epoll,如何添加
+>>>>>>> dev:lodeBalancer/server1.cpp
 						response["FD"] = root["FD"].asInt();
 						response["msgtype"] = EN_MSG_ACK;
 						response["ackcode"] = "sorry, he is not zaixian";	
@@ -233,6 +235,7 @@ void* ReadThread(void *arg)
 	       		case EN_MSG_OFFLINE://离线
 <<<<<<< Updated upstream:lodeBalancer/chatserver.cpp
 				{
+<<<<<<< HEAD:lodeBalancer/chatserver.cpp
 					close(clientfd);
 					//alter_state(int fd);//在states中按照fd将此项删除
 =======
@@ -241,6 +244,10 @@ void* ReadThread(void *arg)
 					//现在的服务器只是连接了一个客户端，即lb
 					delStateByfd(db, clientfd);//user state message
 >>>>>>> Stashed changes:lodeBalancer/server1.cpp
+=======
+					close(clientfd);		
+					delStateByfd(db, clientfd);//bool alter_state(int fd);//在states中按照fd将此项删除
+>>>>>>> dev:lodeBalancer/server1.cpp
 					cout<<"server offlien"<<endl;
 					pthread_exit((void*)1);//服务器是采用的多线程	
 				}
@@ -263,6 +270,7 @@ void ProcListenfd(evutil_socket_t fd, short , void *arg)
     pthread_create(&tid, NULL, ReadThread, (void*)clientfd);
 }
 
+<<<<<<< HEAD:lodeBalancer/chatserver.cpp
 =======
 #define 1024 MESSAGE_MAX_LENGTH
 bool sendMesgFromDb(CMysql &db, int tofd, const char*name, int fd)//寻找，怎么进行触发，登陆时候
@@ -299,3 +307,40 @@ bool sendMesgFromDb(CMysql &db, int tofd, const char*name, int fd)//寻找，怎
 	}
 }
 >>>>>>> Stashed changes:lodeBalancer/server1.cpp
+=======
+//bool delInMessage(cosnt char *name);
+//char * findMesgByName(const char*name);
+
+void sendMesgFromDb(const char*name, int fd)//寻找，怎么进行触发，登陆时候
+{
+	Json::Value response;
+	const char *buff;
+	if ((buff == findMesgByName(name)) == NULL)//得到字符串，在db中对字符串进行包装，再解封
+	{
+		return ;
+	}
+	else
+	{
+		const char *temp = ",";
+
+		char *fd = strtok(buff, temp);
+		char *msg = strtok(buff, temp);
+		char *from =strtok(buff, temp);
+	
+		response["FD"] = fd;
+		response["msgtype"] = EN_MSG_ACK;
+		response["msg"] = buff;
+		response["from"] = from;
+
+		int x = send(fd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str()), 0);
+		if (x<0)
+		{
+			return ;
+		}
+		else
+		{
+			delInMessage(name);//发送成功就将其从数据库中删除
+		}
+	}
+}
+>>>>>>> dev:lodeBalancer/server1.cpp

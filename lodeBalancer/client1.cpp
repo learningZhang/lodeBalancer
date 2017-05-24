@@ -1,5 +1,6 @@
 #include "head.h"
 
+<<<<<<< HEAD:lodeBalancer/chatclient.cpp
 <<<<<<< Updated upstream:lodeBalancer/chatclient.cpp
 
 typedef enum _MsgType
@@ -11,6 +12,8 @@ typedef enum _MsgType
     EN_MSG_ACK
 }EnMsgType;
 
+=======
+>>>>>>> dev:lodeBalancer/client1.cpp
 char name[20];
 char pwd[20];
 =======
@@ -53,6 +56,7 @@ int main(int argc, char **argv)
         cout<<"============"<<endl;   //异常退出-信号
         
         cout<<"choice:";
+<<<<<<< HEAD:lodeBalancer/chatclient.cpp
 <<<<<<< Updated upstream:lodeBalancer/chatclient.cpp
         cin>>choice;
 	cin.get();
@@ -63,6 +67,11 @@ int main(int argc, char **argv)
         choice-='0';
         getchar();
 >>>>>>> Stashed changes:lodeBalancer/client1.cpp
+=======
+        choice = fgetc(stdin)-'0';//一次取出一个字符
+        fflush(stdin);
+	
+>>>>>>> dev:lodeBalancer/client1.cpp
         switch(choice)
         {
             case 1:
@@ -106,6 +115,7 @@ int main(int argc, char **argv)
 		}
         }
     }
+    
     cout<<"welcome to chat system!"<<endl;
     pthread_t tid;
     pthread_create(&tid, NULL, ReadThread, &clientfd);
@@ -159,8 +169,7 @@ void* ReadThread(void *arg)
         if(recv(clientfd, recvbuf, 1024, 0) <= 0)
         {
             cout<<"server connect fail!"<<endl;
-	    return 0;//can reconnnet the server??
-            break;
+	    	return 0;//can reconnnet the server??//连接失败直接退出
         }
         if(reader.parse(recvbuf, root))
         {
@@ -297,8 +306,11 @@ bool offline(int fd)//主动打招呼断开还是直接断开--》服务器的�
 		cout<<"errno "<<errno<<endl;
 	}
 }
+<<<<<<< HEAD:lodeBalancer/chatclient.cpp
 <<<<<<< Updated upstream:lodeBalancer/chatclient.cpp
 =======
+=======
+>>>>>>> dev:lodeBalancer/client1.cpp
 
 //1.密码加密   密钥+明文
 //将密钥存放在客户机中，输入信息之后，和密钥进行加密，将加密后的字符发送给服务器，然后由
@@ -307,5 +319,9 @@ bool offline(int fd)//主动打招呼断开还是直接断开--》服务器的�
 //2.长连接，短链接
 //3.群聊功能
 //4.突发事件的处理
+<<<<<<< HEAD:lodeBalancer/chatclient.cpp
 //5.留言功能的实现
 >>>>>>> Stashed changes:lodeBalancer/client1.cpp
+=======
+//5.留言功能的实现
+>>>>>>> dev:lodeBalancer/client1.cpp
