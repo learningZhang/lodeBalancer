@@ -1,6 +1,10 @@
+<<<<<<< Updated upstream
 #include "head.h"
 #include <mysql/mysql.h>
 
+=======
+#include "mysql.h"
+>>>>>>> Stashed changes
 
 CMysql::CMysql()
 {
@@ -13,7 +17,7 @@ CMysql::CMysql()
 	{
 		cout<<"connect error"<<endl;
 		exit(-1);
-    }
+	}
     
 	if(mysql_select_db(pcon, "chat"))
 	{
@@ -33,7 +37,74 @@ bool CMysql::insertInto_serverfd(int id, int fd)
 	return false;
 }
 
+<<<<<<< Updated upstream
 int CMysql::get_fd(int id)
+=======
+bool CMysql::insertIntoMessage(const char*from, const char*to, const char *mesg)//+time
+{
+	char sql[1024];
+	sprintf(sql, "insert into message values('%s', '%s', '%s')", from, to, mesg);
+
+	if (!mysql_real_query(pcon, sql, strlen(sql)))
+	{
+		return true;
+	}
+	return false;
+}
+
+bool CMysql::delInMessage(const char *name)
+{
+	char sql[100];
+	sprintf(sql, "delete from message where touser='%s'", name);
+	if(!mysql_real_query(pcon, sql, strlen(sql)))
+	{
+		return true;
+	}
+	return false;
+}
+
+bool CMysql::findMessageByName(const char* name, char *message, int length)
+{
+	char sql[100];
+	sprintf(sql, "select fromuser,msg from message where touser='%s'", name);
+	if (mysql_real_query(pcon, sql, strlen(sql)))
+	{//if success will return 0,if fail no 0
+		cout<<mysql_error(pcon)<<endl;		
+		return false;
+	}
+
+	if ((pres=mysql_store_result(pcon)) != NULL)
+	{
+		if ((row=mysql_fetch_row(pres)) != NULL)
+		{
+			int lenth =strlen(row[0]);
+			if (length > lenth)
+			{
+				strcpy(message, row[0]); 
+				strcat(message, "-");//é€šè¿‡åˆ†å‰²å·æ¥åˆ†å¼€
+				strcat(message, row[1]);
+			}
+			else
+			{
+				return false;
+			}
+	//		char *str = (char *)malloc(lenth+1);//ç”¨å®Œä¹‹åè®°å¾—å†…å­˜é‡Šæ”¾
+	//		strcpy(str,row[0]); 
+	//		strcat(str,"-");//é€šè¿‡åˆ†å‰²å·æ¥åˆ†å¼€
+	//		strcat(str,row[1]);
+			return true;
+		}
+		if (mysql_error(pcon) != NULL)
+		{
+			cout<<mysql_error(pcon)<<endl;
+		}
+	}
+	mysql_free_result(pres);
+	return false;	
+}
+//ä»åˆ—è¡¨ä¸­è·å¾—è¯¥passwd,ç„¶åä¸passwdè¿›è¡Œæ¯”è¾ƒ
+bool CMysql::queryPasswd(const char *name, const char *passwd)
+>>>>>>> Stashed changes
 {
 	char sql[100];
 	sprintf(sql, "select fd from serverfd where id=%d", id);
@@ -42,8 +113,13 @@ int CMysql::get_fd(int id)
 		cout<<"error in getstate "<<mysql_error(pcon)<<endl;
 		return -2;
 	}
+<<<<<<< Updated upstream
 
 	if ((pres = mysql_store_result(pcon)) != NULL)//¿¿¿¿¿¿¿
+=======
+	
+	if ((pres = mysql_store_result(pcon)) != NULL)//å°†ç»“æœä¿å­˜äºpresä¸­
+>>>>>>> Stashed changes
 	{
 		if ((row = mysql_fetch_row(pres)) != NULL)//¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿NULL
 		{
@@ -75,10 +151,17 @@ int CMysql::get_id(int fd)
 		cout<<"error in getstate"<<mysql_error(pcon)<<endl;//¿¿¿¿
 		return -2;
 	}
+<<<<<<< Updated upstream
 
 	if ((pres = mysql_store_result(pcon)) != NULL)
 	{
 		if ((row = mysql_fetch_row(pres)) != NULL)//¿¿¿¿¿¿
+=======
+        
+	if ((pres = mysql_store_result(pcon)) != NULL)//é é é é é ?.é é é é é é  2.é é é é é é ?3.é é é ?
+	{
+		if ((row = mysql_fetch_row(pres)) != NULL)//é é é é 
+>>>>>>> Stashed changes
 		{
 			int fd = atoi(row[0]);//¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿¿
 			cout<<"fd is"<<fd<<endl;
@@ -97,17 +180,35 @@ int CMysql::get_id(int fd)
 	return -1;	
 }
 
+<<<<<<< Updated upstream
 bool CMysql::insertIntoUser(const char *name, const char *passwd, const char *call)
 {
 	char sql[100];
 	sprintf(sql, "insert into user values('%s', '%s', '%s')", name, passwd, call);
 	if (!mysql_real_query(pcon, sql, strlen(sql)))
+=======
+bool CMysql::deleteElemBySocket(int fd, int tag)//ä¸€ä¸ªæ—¶é—´æ®µä¸­åªæœ‰ä¸€ä¸ªè¿›ç¨‹ä½¿ç”¨è¯¥fd
+{
+	char sql[100];
+	if (tag == 1)
+	{
+		sprintf(sql, "delete from state where socket = %d", fd);
+	}
+	else
+	{
+		sprintf(sql, "delete from state");
+	}
+	
+	int res = mysql_real_query(pcon, sql, strlen(sql));//æˆåŠŸè¿”å›0
+	if (!res)
+>>>>>>> Stashed changes
 	{
 		return true;
 	}
 	return false;
 }
 
+<<<<<<< Updated upstream
 //´ÓÁĞ±íÖĞ»ñµÃ¸Ãpasswd,È»ºóÓëpasswd½øĞĞ±È½Ï
 bool CMysql::queryPasswd(const char *name, const char *passwd)
 {
@@ -194,3 +295,5 @@ bool CMysql::insertIntoStates(const char *name, int fd)
 	}
 	return false;
 }
+=======
+>>>>>>> Stashed changes

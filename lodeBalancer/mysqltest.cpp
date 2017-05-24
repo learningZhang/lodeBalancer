@@ -1,48 +1,54 @@
-#include <iostream>
-#include <string>
-using namespace std;
-#include <mysql/mysql.h>
-#include <string.h>
-#include <stdio.h>
-
-class CUser
-{
-	public:        
-	private:
-        char name[20];
-        char pwd[20];
-};
+#include "mysql.h"
 
 int main()
 {
-	MYSQL* pcon;
-	MYSQL_RES *pres;
-	MYSQL_ROW row;
+	CMysql db;
+/*	char *name="zhang";
+	char *passwd = "1234";
+	char *email = "awk";
+	if (!db.insertIntoUser(name, passwd, email))
+		cout<<"insert error"<<endl;
+	
+	if (!db.queryPasswd(name, passwd))
+		cout<<"passwd query error"<<endl;
 
-	pcon = mysql_init((MYSQL*)0);
-	MYSQL *tmp = mysql_real_connect(pcon, "127.0.0.1", "root", "xuanyu", NULL, 5000, NULL, 0);
-	if (tmp == NULL)
+	if (!db.deleteUser(name))
+		cout<<"delete error"<<endl;
+
+	int fd =100;
+	if (!db.insertIntoStates(name, fd))
+		cout<<"insert into states error"<<endl;
+
+	int x = 0;
+	if((x=db.getStates(name)) == -1)
+		cout<<"getStates error"<<endl;
+	cout<<"fd is "<<x<<endl;
+///
+	if(!db.deleteElemBySocket(fd, 1))
 	{
-		cout<<"error"<<endl;
+		cout<<"delete error"<<endl;
 	}
-	cout<<"connect "<<endl;
-	mysql_select_db(pcon, "chat");
 
-	char sql[100];
-	sprintf(sql, "select * from user");
-	mysql_real_query(pcon, sql, strlen(sql));
-
-	pres = mysql_store_result(pcon);
-	while(row = mysql_fetch_row(pres))
+	char *msg = "nizhoa";
+	if (!db.insertIntoMessage("zhang", "wang", msg))//from to msg
 	{
-		for(int i=0; i<mysql_num_fields(pres); ++i)
-		{
-			cout<<row[i]<<" ";
-		}
-		cout<<endl;
+		cout<<"error in insert into Mesg"<<endl;
 	}
-	mysql_free_result(pres);
-	mysql_close(pcon);
+*/
+	char *temp=NULL;
+	if ((temp = db.findMesgByName("wanug")) == NULL)
+	{
+		cout<<"find error"<<endl;
+	}
+	else
+	{
+		cout<<temp<<endl;free(temp);
+	}
 
-	return 0;
+//	if(!db.delInMessage("wang"))
+//	{
+//		cout<<"error in delMessage"<<endl;
+//	}
+	
+	cout<<"ending"<<endl;
 }

@@ -20,8 +20,22 @@ using namespace std;
 #include <errno.h>
 #include <mysql/mysql.h>
 #include <list>
+#include "mysql.h"
 
+<<<<<<< Updated upstream
 class CMysql
+=======
+
+#define THREAD_NUM 3
+#define MAX 50 //µ¥Ïß³ÌÖĞÒ»¸öepoll×î¶à¿ÉÒÔ½ÓÊÜµÄÎÄ¼şÃèÊö·û
+
+#define FD_NUM 3
+
+
+
+extern map<int, int> ser_to_cli;
+typedef enum _MsgType
+>>>>>>> Stashed changes
 {
 	public:
 		CMysql();
@@ -74,9 +88,25 @@ bool registe(int fd);
 
 void* ReadThread(void *arg);
 
-bool doLogin(int fd);
+bool doLogin(int fd, char *name);
 
 bool offline(int fd);//ä¸»åŠ¨æ‰“æ‹›å‘¼æ–­å¼€è¿˜æ˜¯ç›´æ¥æ–­å¼€--ã€‹æœåŠ¡å™¨çš„èµ„æº
 
 
+<<<<<<< Updated upstream
 //test the git
+=======
+int search_cli_to_ser_fd(int fd);
+
+bool sendMesgFromDb(CMysql &db, int tofd, const char*name, int fd);
+
+bool delSendedMsg(CMysql &db, const char *name);
+
+bool delStateByfd(CMysql &db, int fd);
+
+bool insertIntoMessage(const char *fromuser, const char *touser, const char* msg, CMysql &db);
+
+char* findMesgByName(CMysql &db, const char*name);
+
+
+>>>>>>> Stashed changes

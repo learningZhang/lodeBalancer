@@ -1,5 +1,6 @@
 #include "head.h"
 
+<<<<<<< Updated upstream:lodeBalancer/chatclient.cpp
 
 typedef enum _MsgType
 {
@@ -12,6 +13,8 @@ typedef enum _MsgType
 
 char name[20];
 char pwd[20];
+=======
+>>>>>>> Stashed changes:lodeBalancer/client1.cpp
 
 int main(int argc, char **argv)
 {
@@ -37,9 +40,10 @@ int main(int argc, char **argv)
         return -1;
     }
     
-    int choice = 0;
+    char choice = 0;
     bool bloginsuccess = false;
-    
+
+    char name[20];    
     while (!bloginsuccess)
     {
         cout<<"============"<<endl;
@@ -49,22 +53,29 @@ int main(int argc, char **argv)
         cout<<"============"<<endl;   //异常退出-信号
         
         cout<<"choice:";
+<<<<<<< Updated upstream:lodeBalancer/chatclient.cpp
         cin>>choice;
 	cin.get();
 		
+=======
+        //cin>>choice;
+        scanf("%c", &choice);
+        choice-='0';
+        getchar();
+>>>>>>> Stashed changes:lodeBalancer/client1.cpp
         switch(choice)
         {
             case 1:
 	        {
-            	if(doLogin(clientfd))    
-            	{
-	            	bloginsuccess = true;
-	            }  
-            	else
-            	{
-	            	cout<<"login fail!"<<endl;
-	            }  
-            	break;
+            		if(doLogin(clientfd, name))    
+            		{
+	            		bloginsuccess = true;
+	        	}  
+            		else
+            		{
+	            		cout<<"login fail!"<<endl;
+	        	}	  
+            		break;
         	}
            
             case 2:
@@ -92,7 +103,7 @@ int main(int argc, char **argv)
 	        {
                 cout<<"invalid input!"<<endl;
 				continue;
-			}
+		}
         }
     }
     cout<<"welcome to chat system!"<<endl;
@@ -110,7 +121,7 @@ int main(int argc, char **argv)
 	        offline(clientfd);
 	        cout<<"by close to shutdown client"<<endl;
 			close(clientfd);
-            exit(0);
+                exit(0);
         }
         
         string parsestr = chatbuf;
@@ -121,9 +132,20 @@ int main(int argc, char **argv)
         root["to"] = parsestr.substr(0, offset);
         root["msg"] = parsestr.substr(offset+1, parsestr.length()-offset-1);
         size = send(clientfd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str())+1, 0);
+		if (size <= 0)
+		{
+			cout<<"send error"<<endl;
+			if (errno)
+			{
+				cout<<"errno  is: "<<errno<<endl;
+			}
+		}
     }
     return 0;
 }
+
+//如果我断开连接，我应该通知我的客户失去连接，并且请求重新连接
+//现在我的情况是断开连接就会结束该进程
 
 void* ReadThread(void *arg)
 {
@@ -166,7 +188,8 @@ bool registe(int fd)
 	char email[20];
 	char passwd[20];
 	char recvbuf[1024];
-	
+
+	cin.getline(name, 20);
 	cout<<"your name: ";
 	cin.getline(name, 20);
 	cout<<"input passwd: ";
@@ -188,10 +211,16 @@ bool registe(int fd)
 	}
 
 	size = recv(fd, recvbuf, 1024, 0);
-	if (size <= 0)
+	if (size < 0)
 	{
 		cout<<"register info ack fail"<<endl;
+		cout<<"errno is: "<<errno<<endl;
 		return false;
+	}
+	else if(size == 0)
+	{
+		cout<<"连接断开在198"<<endl;
+		exit(-1);
 	}
 
 	cout<<"recv buff "<<recvbuf<<endl;
@@ -215,13 +244,14 @@ bool registe(int fd)
 }
 
 
-bool doLogin(int fd)
+bool doLogin(int fd, char *name)
 {
+    char pwd[20];
+    getchar();
     cout<<"name:";
-    cin.getline(name, 20);
+    cin.getline(name, 20); 
     cout<<"pwd:";
     cin.getline(pwd, 20);
-    
     Json::Value root;
     root["msgtype"] = EN_MSG_LOGIN;
     root["name"] = name;
@@ -229,11 +259,16 @@ bool doLogin(int fd)
   
     send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str())+1, 0);
     char recvbuf[1024]={0};
-    
-    if(recv(fd, recvbuf, 1024, 0) <= 0)
+    int size = recv(fd, recvbuf, 1024, 0);
+    if(size == 0)//连接断开
     {
         cout<<"recv server login ack fail!"<<endl;
         exit(0);
+    }
+    else if(size<0)//受到信息失败
+    {
+	    cout<<"erron is"<<errno<<endl;
+	    return false;
     }
     cout<<"recv buff is "<<recvbuf<<endl;
    
@@ -257,5 +292,20 @@ bool offline(int fd)//主动打招呼断开还是直接断开--》服务器的�
 {
 	Json::Value  root;
 	root["msgtype"] = EN_MSG_OFFLINE;
-	send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str()), 0);
+	if(send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str()), 0)==0)
+	{
+		cout<<"errno "<<errno<<endl;
+	}
 }
+<<<<<<< Updated upstream:lodeBalancer/chatclient.cpp
+=======
+
+//1.密码加密   密钥+明文
+//将密钥存放在客户机中，输入信息之后，和密钥进行加密，将加密后的字符发送给服务器，然后由
+//服务器进行匹配
+
+//2.长连接，短链接
+//3.群聊功能
+//4.突发事件的处理
+//5.留言功能的实现
+>>>>>>> Stashed changes:lodeBalancer/client1.cpp
