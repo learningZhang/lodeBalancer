@@ -26,7 +26,7 @@ using namespace std;
 #define  MESSAGE_MAX_LENGTH 1024
 
 #define THREAD_NUM 3
-#define MAX 50 //单线程中一个epoll最多可以接受的文件描述符
+#define MAX 500 //单线程中一个epoll最多可以接受的文件描述符
 
 #define FD_NUM 3
 
