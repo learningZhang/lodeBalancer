@@ -20,6 +20,7 @@ CMysql::CMysql()
 	}
 }
 
+
 bool CMysql::insertIntoUser(const char *name, const char *passwd, const char *call)
 {
 	char sql[100];
@@ -84,6 +85,7 @@ bool CMysql::findMessageByName(const char* name, char *str, int length)
 	return true;;	
 }
 //从列表中获得该passwd,然后与passwd进行比较
+
 bool CMysql::queryPasswd(const char *name, const char *passwd)
 {
 	char sql[100];

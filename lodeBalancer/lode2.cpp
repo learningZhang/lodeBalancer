@@ -1,43 +1,43 @@
 //for file lode1
+#include "connectSer.h"
 #include "head.h"
+#include "lode.h"
+
 extern int serverfd[FD_NUM];
 extern int ppfd[2];
 map<int, int> ser_to_cli;
 
-void server_start()//向第index的服务器发送数据
+//负载均衡器作为客户端和聊天服务器建立连接
+
+ConnectServer** server_start()//试图用设计模式中的模式来将其处理的更加平滑
 {
-	int port = 10000;//与聊天服务器相对应的客户端
-	char *ip = "127.0.0.1";
-	for(int i=0; i<FD_NUM; i++)
+	char *ip1 = "127.0.0.2";
+	char *ip2 = "127.0.0.3";
+	char *ip3 = "127.0.0.4";
+	//ConnectServer *server = (ConnectServer *)malloc(sizeof(ConnectServer*)*FD_NUM);
+	//assert(server != NULL);
+	ConnectServer **server = new ConnectServer*[FD_NUM];
+	server[0] = new ConnectServer(ip1, 6002);//连接到一号服务器
+	server[1] = new ConnectServer(ip2, 6003);//连接到二号服务器
+	server[2] = new ConnectServer(ip3, 6004);//连接到三号服务器
+	for (int i=0; i<FD_NUM; ++i)
 	{
-		int ret = connect_server(port, ip, i);
-		if (ret == -1)
-		{
-			cout<<"server "<<ret<<" can't open"<<endl;
-			return ;
-		}
-		cout<<"server["<<i<<"]   open"<<endl;
-	}
+		serverfd[i] = server[i]->clientfd;
+	}	
+	return server;
 }
 
-bool connect_server(int port, char *ip, int index)
+void server_free(ConnectServer**server)
 {
-	int clientfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(clientfd == -1) {return false;}
-
-	sockaddr_in caddr;
-	memset(&caddr, 0, sizeof(caddr));
-	
-	caddr.sin_family = AF_INET;
-	caddr.sin_port = htons(port);
-	caddr.sin_addr.s_addr = inet_addr(ip);
-
-	int ret = connect(clientfd, (sockaddr*)&caddr, sizeof(caddr));
-	if (ret == -1) {return false;}
-	
-	serverfd[index] = clientfd; //连接上服务端
-	return true;
+	for (int i=0;i<FD_NUM; ++i)
+	{
+		delete server[i];
+	}
+	delete [] server;
 }
+
+//模拟的时候，在负载均衡的进程中开了三个连接到服务器的连接，然后通过负载均衡算法将通过这三个
+//不同的连接socket将消息发送到同一个服务器,用此来减轻调试过程中的复杂度
 
 void pthread_pool()
 {

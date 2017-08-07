@@ -1,4 +1,12 @@
-#include"head.h"
+#define _LODE_ 
+
+#include "head.h"
+#include "connectSer.h"
+#include "lode.h"
+#include "mysql.h"
+
+#define FD_NUM 3
+
 int serverfd[FD_NUM]={0};//服务器的fd
 int ppfd[2]={0};
 
@@ -26,28 +34,33 @@ int main()
 		return -1;
 	}
 	
-	server_start();
+	ConnectServer **server = server_start();//连接服务器，反向代理功能
     assert(pipe(ppfd) != -1);
-	pthread_pool();
+    
+	pthread_pool();//开启处理客户程序的处理线程
 
  	struct event_base *base = event_init();
-	struct event *listen_event = event_new(base, sockfd, EV_READ|EV_PERSIST, Listenfd, NULL);    	event_add( listen_event, NULL );
+	struct event *listen_event = event_new(base, sockfd, EV_READ|EV_PERSIST, Listenfd, NULL);
+
+	event_add( listen_event, NULL );
 
    	cout<<"lodebalancer is started..."<<endl;
     
    	event_base_dispatch(base);
+
+   	server_free(server);
    	event_free(listen_event);
    	event_base_free(base);
    	return 0;
 }
-
+#define MAX 100
 void* thread_func(void *)
 {
 	CMysql db;
 	int epollfd =  epoll_create(MAX);
 	struct epoll_event events[MAX];       
 	
-	addEvent(epollfd, ppfd[0]);
+	addEvent(epollfd, ppfd[0]);//还是会引起惊群现象
 
 	for(int i=0; i<FD_NUM; ++i)
 	{
@@ -71,18 +84,6 @@ void* thread_func(void *)
 				return NULL;
 			}
 		}
-		//两种情况，一个是客户端和lb断开联系，一个是服务器与lb断开联系，
-		//客户端与lb断开来连接，将客户端的信息清除，从epoll中删除该客户端的fd,让客户端重新连接
-		//lb与服务器断开连接，lb中是epoll结构，而服务器中是多线程，是一个断开连接
-		//多个服务器进程在运行，探测到某个服务器突然断开就要重新分配该服务器中所有
-		//连接的fd给其他服务器
-
-		//进程与进程之间断开了连接
-		//两个机器之间断开了连接
-
-		//如何知道是服务器断开连接还是只是进程之间断开连接----心跳包
-
-		//现在所能做的就是假设只是个别的连接断开了
 
 		int delEvent[100];
 		int f = 0;
@@ -111,13 +112,8 @@ void* thread_func(void *)
 				{
 					cout<<"with server break out"<<endl;
 					//int new_given();
-					continue;
-					//lb是多线程+epoll模型，连接了多个服务器
-					//一个线程一个epoll,有请求之后，查询它是属于哪一个服务器管的，然后找到该服务器的fd
-	
-					//重新分配，然后继续正常运行
+					continue;	
 					//应该将所连接到该服务器上的所有客户端重新分配给剩下的客户端，然后continue;
-					
 				}
 				else if(ret<0)
 				{
@@ -150,7 +146,7 @@ void* thread_func(void *)
 					else
 					{
 						response["FD"] = fd;//向服务器报信
-						response["msgtype"] = offline;
+						response["msgtype"] = 4;//++++++++++++++++++++++++++++++
 						send(serfd, response.toStyledString().c_str(), 
 						  strlen(response.toStyledString().c_str())+1, 0);//告诉server去修改state表中的用户状态
 					}
@@ -193,7 +189,6 @@ void* thread_func(void *)
 	}	
 }
 
-
 void Listenfd(evutil_socket_t fd, short int , void *arg)//主线程
 {
 	CMysql db;
@@ -212,8 +207,7 @@ void Listenfd(evutil_socket_t fd, short int , void *arg)//主线程
 	}
 }
 
-//留言功能？？？？？？？？？？
-//按照留言中的姓名进行查找，如果此人存在就对其发送信息
+
 //数据库中查找，是要开辟新的线程给其还是在线程中利用文件描述符制作统一事件源
 
 //如果在此方向发现了客户端掉线就发送消息给服务器端，服务器端用此来对数据库进行操作state
@@ -228,5 +222,8 @@ void Listenfd(evutil_socket_t fd, short int , void *arg)//主线程
 //添加表，用来记录服务器和客户端的对应关系
 
 
-//一个服务器与lb之间的连接只有一个，当期之间发生断开连接的时候lb要将该服务器所连接
-//至其上的所有客户端重新分配
+//两种情况，一个是客户端和lb断开联系，一个是服务器与lb断开联系，客户端与lb断开来连接，将客户端的信息清除，从epoll中删除该客户端的fd,让客户端重新连接
+//lb与服务器断开连接，lb中是epoll结构，而服务器中是多线程，是一个断开连接
+//多个服务器进程在运行，探测到某个服务器突然断开就要重新分配该服务器中所有连接的fd给其他服务器
+		
+//如何知道是服务器断开连接还是只是进程之间断开连接----心跳包
