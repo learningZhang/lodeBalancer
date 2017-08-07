@@ -1,8 +1,18 @@
 #include "head.h"
+#include "mysql.h"
+#include "server.h"
 //#include "memcached.h"
 
-int main()
+int main(int argc, char **argv)//负载均衡器
 {
+	if (argc < 3)
+	{
+		cout<<"need ip and port";
+		return 0;
+	}
+	char *ip = argv[1];
+	int port = atoi(argv[2]);
+	
     int listenfd;
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if(listenfd == -1)
@@ -13,8 +23,8 @@ int main()
     sockaddr_in server;
     memset(&server, 0, sizeof(sockaddr_in));
     server.sin_family = AF_INET;
-    server.sin_port = htons(10000);
-    server.sin_addr.s_addr = inet_addr("127.0.0.1");
+    server.sin_port = htons(port);
+    server.sin_addr.s_addr = inet_addr(ip);
 
     if(-1 == bind(listenfd, (sockaddr*)&server, sizeof(server)))
     {
@@ -30,11 +40,18 @@ int main()
 
     pthread_t tid;
     struct event_base* base = event_init();
+    
     struct event *listen_event = event_new(base, listenfd,  EV_READ|EV_PERSIST, ProcListenfd, &tid);
+
     event_add( listen_event, NULL );
 
     cout<<"server started..."<<endl;
+
     event_base_dispatch(base);
+
+    event_free(listen_event);
+    
+   	event_base_free(base);
     return 0;   
 }
 
@@ -50,45 +67,9 @@ void ProcListenfd(evutil_socket_t fd, short , void *arg)
     pthread_create(&tid, NULL, ReadThread, (void*)clientfd);
 }
 
-bool sendMesgFromDb(CMysql &db, int tofd, const char*name, int fd)
-{
-        Json::Value response;
-        char *buff;
-        char *temp=(char *)malloc(MESSAGE_MAX_LENGTH*sizeof(char));
-        if (temp == NULL) return false;
-	memset(temp, 0, MESSAGE_MAX_LENGTH);
-        if (!findMesgByName(db, name, temp, MESSAGE_MAX_LENGTH))
-        {
-                free(temp);
-		temp = NULL;
-                return false;
-        }
-        else
-        {
-                const char *tmp = "-";
-                char *fromuser = strtok(buff, tmp);
-                char *msg = strtok(NULL, tmp);
-
-                response["FD"] = tofd;
-                response["msgtype"] = EN_MSG_ACK;
-                response["msg"] = buff;
-                response["from"] = fromuser;
-
-                int x = send(fd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str()), 0);
-                free(temp);
-		temp = NULL;
-                if (x == -1)
-                {
-                        return false;
-                }
-                return true;
-        }
-}
-
-
 void* ReadThread(void *arg)
 {
-	CMysql db;
+	CMysql db;//每一个线程中开一个
     	int clientfd = (int)arg;
     	while(true)
     	{
@@ -96,12 +77,12 @@ void* ReadThread(void *arg)
       		char recvbuf[1024]={0};
 
         	Json::Reader reader;
-        	Json::Value root;
+       	 	Json::Value root;
         	Json::Value response;
 
                 size = recv(clientfd, recvbuf, 1024, 0);
                 if (size <= 0)
-        	{
+    	    	{
                 	cout<<"client connect fail!"<<errno<<endl;
                 	close(clientfd);
                 	return NULL;
@@ -122,7 +103,7 @@ void* ReadThread(void *arg)
                     			if(db.queryPasswd(name.c_str(), root["pwd"].asString().c_str()))
                     			{
                         			response["ackcode"] = "ok";
-                                        	if (!db.insertIntoStates(name.c_str(), root["FD"].asInt()))
+                                    if (!db.insertIntoStates(name.c_str(), root["FD"].asInt()))
                         			{
                                 			cout<<"insertIntoStates error"<<endl;
                         			}
@@ -166,7 +147,7 @@ void* ReadThread(void *arg)
                                         string email = root["email"].asString();
 
                                         response["msgtype"] = EN_MSG_ACK;
-                                	response["FD"] = root["FD"].asInt();
+                                		response["FD"] = root["FD"].asInt();
 
                                         if (!db.insertIntoUser(name.c_str(), passwd.c_str(), email.c_str()))
                                         {
@@ -177,7 +158,7 @@ void* ReadThread(void *arg)
                                         {
                                                 response["ackcode"] = "yes";
                                         }
-                                	send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
+                                		send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
                                 }
                         	break;
 
@@ -188,8 +169,42 @@ void* ReadThread(void *arg)
                                         cout<<"server offlien"<<endl;
                                 }
                                 break;
-
             }
         }
     }
+}
+
+bool sendMesgFromDb(CMysql &db, int tofd, const char*name, int fd)
+{
+        Json::Value response;
+        char *buff;
+        char *temp=(char *)malloc(MESSAGE_MAX_LENGTH*sizeof(char));
+        if (temp == NULL) return false;
+		memset(temp, 0, MESSAGE_MAX_LENGTH);
+        if (!findMesgByName(db, name, temp, MESSAGE_MAX_LENGTH))
+        {
+                free(temp);
+		temp = NULL;
+                return false;
+        }
+        else
+        {
+                const char *tmp = "-";
+                char *fromuser = strtok(buff, tmp);
+                char *msg = strtok(NULL, tmp);
+
+                response["FD"] = tofd;
+                response["msgtype"] = EN_MSG_ACK;
+                response["msg"] = buff;
+                response["from"] = fromuser;
+
+                int x = send(fd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str()), 0);
+                free(temp);
+				temp = NULL;
+                if (x == -1)
+                {
+                        return false;
+                }
+                return true;
+        }
 }

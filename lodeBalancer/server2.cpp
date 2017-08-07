@@ -1,5 +1,6 @@
-//from server file--
 #include "head.h"
+#include "mysql.h"
+#include "server.h"
 
 int searchFd(CMysql &db, const char *name)
 {
