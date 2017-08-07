@@ -35,4 +35,35 @@ class CMysql
 		const char *passwd;
 		unsigned short port;
 };
-
+/*
+class Cmysql
+{
+	public:
+		static CMysql* createMysql()
+		{
+			if (mysql == NULL)
+			{
+			///	lock()
+			//	{
+					if (mysql == NULL)
+					{
+						mysql = new CMysql;
+					}
+			//	}
+			}
+			return mysql;
+		}
+		static CMysql *mysql;	
+	private:
+		Cmysql()
+		{
+			CMysql();
+		}
+		~Cmysql()
+		{
+			delete mysql;
+		}
+		//pthread_mutex_t mutex;//对mutex进行初始化
+};
+CMysql *Cmysql::mysql=NULL;
+*/
