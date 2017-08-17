@@ -4,8 +4,11 @@
 #include "connectSer.h"
 #include "lode.h"
 #include "mysql.h"
+#include "mutex.h"
 
 #define FD_NUM 3
+
+#define MAX 100
 
 int serverfd[FD_NUM]={0};//服务器的fd
 int ppfd[2]={0};
@@ -38,7 +41,7 @@ int main()
     assert(pipe(ppfd) != -1);
     
 	pthread_pool();//开启处理客户程序的处理线程
-
+	CMutex mutex; //定义信号量对象，后面信号量实现管道文件描述符的互斥操作
  	struct event_base *base = event_init();
 	struct event *listen_event = event_new(base, sockfd, EV_READ|EV_PERSIST, Listenfd, NULL);
 
@@ -53,14 +56,18 @@ int main()
    	event_base_free(base);
    	return 0;
 }
-#define MAX 100
+
 void* thread_func(void *)
 {
+	int acceptCientNum = 0;
+	int disable=acceptCientNum/8 - (MAX-acceptCientNum);
+	//平衡因子，所有连接数量的除以8-空闲的连接数量
+	
 	CMysql db;
 	int epollfd =  epoll_create(MAX);
 	struct epoll_event events[MAX];       
 	
-	addEvent(epollfd, ppfd[0]);//还是会引起惊群现象
+	//addEvent(epollfd, ppfd[0]);//还是会引起惊群现象
 
 	for(int i=0; i<FD_NUM; ++i)
 	{
@@ -77,6 +84,7 @@ void* thread_func(void *)
 	
 	while (true)
 	{
+		get_pipefd_clock(disable, epollfd, fd, mutex);//获取锁，成功由该线程接收新连接，否则其它线程接受，使用trylock，获取锁失败立即返回，锁是对数据进行保护
 		if ((res = epoll_wait(epollfd, events, MAX, -1)) == -1)
 		{        
 			if (errno != EINTR)
@@ -87,6 +95,7 @@ void* thread_func(void *)
 
 		int delEvent[100];
 		int f = 0;
+
 		int pfd = 0;		
 		for (int i=0; i<res; ++i)
 		{			
@@ -100,18 +109,21 @@ void* thread_func(void *)
 					continue;
 				}
 				addEvent(epollfd, atoi(pipebuff));
+				++acceptCientNum;//添加了新的连接，就将该线程的连接数量加1
 				cout<<"pipe buff is "<<pipebuff<<endl;
+				getoff_pipefd_clock(epollfd, fd, mutex); //将管道文件描述符从该epoll中剔除出去
 			}
-			else if (judge(fd))
-			{		//服务器---lb
+			else if (judge(fd))//服务器---lb
+			{		
 				ret = recv(fd, buff, 1024, 0);
 				cout<<"recv from server "<<buff<<endl;
-				//首先客户端和lb断开，客户端发送消息告诉服务器断开连接
-				//然后服务器就对该采取行动
+				
+				//客户端和lb断开，客户端发送消息告诉服务器断开连接.然后服务器就对该采取行动
 				if (ret == 0)
 				{
 					cout<<"with server break out"<<endl;
-					//int new_given();
+					//int new_given();//如何将服务器中的信息全部重新分配
+					//查看数据库中与服务器
 					continue;	
 					//应该将所连接到该服务器上的所有客户端重新分配给剩下的客户端，然后continue;
 				}
@@ -131,7 +143,7 @@ void* thread_func(void *)
 					}   
 				}
 			}
-			else//客户端和lb断开了连接
+			else//客户端
 			{		
 				int serfd = 0;  	
 				ret = recv(fd, buff, 1024, 0);
@@ -155,8 +167,7 @@ void* thread_func(void *)
 				}
 				else if (ret < 0)
 				{
-					cout<<"recv error"<<endl;
-					cout<<"errno is :"<<errno<<endl;
+					cout<<"recv error,errno is :"<<errno<<endl;
 					continue;
 				}
 
@@ -183,6 +194,8 @@ void* thread_func(void *)
 		{
 			for (int i=0; i<f; ++i)
 			{
+				//断开连接 --acceptCientNum;
+				--acceptCientNum;
 				deleteEvent(epollfd, delEvent[i], events);
 			}		
 		}
