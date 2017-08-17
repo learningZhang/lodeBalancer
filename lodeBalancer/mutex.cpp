@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <pthread.h>
 #include <unistd.h>
-
+#include "mutex.h"
 CMutex::CMutex()
 {
 	assert(pthread_mutex_init(&mutex, NULL)!=0);
