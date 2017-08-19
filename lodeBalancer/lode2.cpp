@@ -1,25 +1,34 @@
 //for file lode1
-#include "connectSer.h"
 #include "head.h"
+#include "conHash.h"
+#include "connectSer.h"
 #include "lode.h"
 
-extern int serverfd[FD_NUM];
+extern int serverfd[FD_NUM];//均衡算法中的轮转辅助数组
 extern int ppfd[2];
 map<int, int> ser_to_cli;
 
 //负载均衡器作为客户端和聊天服务器建立连接
 
-ConnectServer** server_start()//试图用设计模式中的模式来将其处理的更加平滑
+ConnectServer** server_start(CConHash* &conhash)//试图用设计模式中的模式来将其处理的更加平滑
 {
 	char *ip1 = "127.0.0.2";
 	char *ip2 = "127.0.0.3";
 	char *ip3 = "127.0.0.4";
-	//ConnectServer *server = (ConnectServer *)malloc(sizeof(ConnectServer*)*FD_NUM);
-	//assert(server != NULL);
 	ConnectServer **server = new ConnectServer*[FD_NUM];
+	
 	server[0] = new ConnectServer(ip1, 6002);//连接到一号服务器
 	server[1] = new ConnectServer(ip2, 6003);//连接到二号服务器
 	server[2] = new ConnectServer(ip3, 6004);//连接到三号服务器
+
+	CNode_s * node1 = new CNode_s("machineA", 280, ip1);//建立一个结点
+	CNode_s * node2 = new CNode_s("machineB", 280, ip2);
+	CNode_s * node3 = new CNode_s("machineC", 280, ip3);
+
+	conhash->addNode_s(node1); 
+	conhash->addNode_s(node2);
+	conhash->addNode_s(node3);
+	
 	for (int i=0; i<FD_NUM; ++i)
 	{
 		serverfd[i] = server[i]->clientfd;
@@ -63,14 +72,27 @@ bool judge(int fd)
 }
 
 static int tag = 0;
-int select_server(int fd)
+int select_server(int fd, CConHash*&conhash)
 {
-	return tag = (tag+1)%3;
+	//根据fd找到ip地址
+	sockaddr addr;
+	socklen_t lenth = sizeof(addr);
+	int x = getpeername(fd, &addr, &lenth);
+	if (x == 0)
+	{
+		CNode_s *node;
+		node = conhash->lookupNode_s(inet_ntoa((*(sockaddr_in*)&addr).sin_addr));
+		if(strcmp(node->getIden(),"machineA")==0) return 0;
+		if(strcmp(node->getIden(),"machineB")==0) return 1;
+		if(strcmp(node->getIden(),"machineC")==0) return 2;
+	}
+	else
+		return tag = (tag+1)%3;//返回的是序号
 }
 
-int deleteEvent(int epfd,int fd, struct epoll_event *event)
+int deleteEvent(int epfd,int fd)
 {
-	epoll_ctl(epfd, EPOLL_CTL_DEL, fd, event);
+	epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
 }
 
 int setnomblocking(int fd)

@@ -1,5 +1,5 @@
-lb:CConHash.o CHashFun.o CMd5.o CMD5HashFun.o CNode_s.o CVirtualNode_s.o CRBTree.o
-	g++ -o lb Main.cpp CConHash.o CHashFun.o CMd5.o CMD5HashFun.o CNode_s.o CVirtualNode_s.o
+lb:CRBTree.o CConHash.o CHashFun.o CMd5.o CMD5HashFun.o CNode_s.o CVirtualNode_s.o
+	g++ -o lb Main.cpp CConHash.o CHashFun.o CMd5.o CMD5HashFun.o CNode_s.o CVirtualNode_s.o CRBTree.o
 	
 CConHash.o:CConHash.cpp CConHash.h 
 	g++ -c CConHash.cpp
@@ -20,4 +20,6 @@ CVirtualNode_s.o:CVirtualNode_s.cpp CVirtualNode_s.h
 	g++ -c CVirtualNode_s.cpp
 CRBTree.o:CRBTree.cpp CRBTree.h
 	g++ -c CRBTree.cpp	
-	
+
+clean:
+	rm CRBTree.o CConHash.o CHashFun.o CMd5.o CMD5HashFun.o CNode_s.o CVirtualNode_s.o	

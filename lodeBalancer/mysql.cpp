@@ -70,11 +70,12 @@ bool CMysql::findMessageByName(const char* name, char *str, int length)
 		if ((row=mysql_fetch_row(pres)) != NULL)
 		{
 			int lenth =strlen(row[0]);
-			if(lenth > length)  return NULL;
+			if(lenth > length)  return false;
 			strcpy(str,row[0]); 
 			strcat(str,"-");
 			strcat(str,row[1]);
-			return str;
+			cout<<"from mysql:  "<<str<<endl;
+			return true;
 		}
 		if (mysql_error(pcon) != NULL)
 		{
@@ -82,7 +83,7 @@ bool CMysql::findMessageByName(const char* name, char *str, int length)
 		}
 	}
 	mysql_free_result(pres);
-	return true;;	
+	return false;	
 }
 //从列表中获得该passwd,然后与passwd进行比较
 
@@ -93,7 +94,7 @@ bool CMysql::queryPasswd(const char *name, const char *passwd)
 	if (mysql_real_query(pcon, sql, strlen(sql)))
 	{
 		cout<<mysql_error(pcon)<<endl;
-		return -2;
+		return false;
 	}
 	
 	if ((pres = mysql_store_result(pcon)) != NULL)//将结果保存于pres中

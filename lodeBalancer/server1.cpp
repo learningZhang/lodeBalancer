@@ -9,10 +9,10 @@ int main(int argc, char **argv)//¸ºÔØ¾ùºâÆ÷
 	{
 		cout<<"need ip and port";
 		return 0;
-	}
-	char *ip = argv[1];
-	int port = atoi(argv[2]);
-	
+	} 
+    char *ip = argv[1];
+    int port = atoi(argv[2]);
+
     int listenfd;
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if(listenfd == -1)
@@ -51,7 +51,7 @@ int main(int argc, char **argv)//¸ºÔØ¾ùºâÆ÷
 
     event_free(listen_event);
     
-   	event_base_free(base);
+    event_base_free(base);
     return 0;   
 }
 
@@ -60,8 +60,7 @@ void ProcListenfd(evutil_socket_t fd, short , void *arg)
     sockaddr_in client;
     socklen_t len = sizeof(client);
     int clientfd = accept(fd, (sockaddr*)&client, &len);
-    cout<<"new client connect server! client info:"
-        <<inet_ntoa(client.sin_addr)<<" "<<ntohs(client.sin_port)<<endl;
+    cout<<"new client connect server! client info:"<<inet_ntoa(client.sin_addr)<<" "<<ntohs(client.sin_port)<<endl;
 
     pthread_t tid;
     pthread_create(&tid, NULL, ReadThread, (void*)clientfd);
@@ -81,12 +80,18 @@ void* ReadThread(void *arg)
         	Json::Value response;
 
                 size = recv(clientfd, recvbuf, 1024, 0);
-                if (size <= 0)
+                if (size == 0)
     	    	{
                 	cout<<"client connect fail!"<<errno<<endl;
                 	close(clientfd);
                 	return NULL;
         	}
+
+		else if (size < 0)//¿¿¿¿¿¿¿¿¿¿¿¿++++++++++
+		{
+			cout<<"the data server read fail"<<endl;
+			continue;
+		}
 
                 cout<<"recvbuf is  "<<recvbuf<<endl;
                 if (reader.parse(recvbuf, root))
@@ -103,7 +108,7 @@ void* ReadThread(void *arg)
                     			if(db.queryPasswd(name.c_str(), root["pwd"].asString().c_str()))
                     			{
                         			response["ackcode"] = "ok";
-                                    if (!db.insertIntoStates(name.c_str(), root["FD"].asInt()))
+                                                if (!db.insertIntoStates(name.c_str(), root["FD"].asInt()))
                         			{
                                 			cout<<"insertIntoStates error"<<endl;
                         			}
@@ -113,13 +118,13 @@ void* ReadThread(void *arg)
                         			response["ackcode"] = "error";
                    		 	}
                     			send(clientfd, response.toStyledString().c_str(),strlen(response.toStyledString().c_str())+1, 0);
-                    			sendMesgFromDb(db, root["FD"].asInt(), root["name"].asString().c_str(), clientfd);                
+					sendMesgFromDb(db, root["FD"].asInt(), root["name"].asString().c_str(), clientfd); //user logging       
 				}
                 		break;
 
-                		case EN_MSG_CHAT://chat with other
+                		case EN_MSG_CHAT:
                 		{
-                                        int tempfd = db.getStates(root["to"].asString().c_str());
+                                        int tempfd = db.getStates(root["to"].asString().c_str());//¿¿¿¿¿¿¿¿¿¿¿¿¿
                                         cout<<"to "<<root["to"].asString().c_str()<<"  tempfd is  "<<tempfd<<endl;
 
                                         if(tempfd != -1)
@@ -128,10 +133,18 @@ void* ReadThread(void *arg)
                                                 response["from"] = root["from"].asString();
                                                 response["msg"] = root["msg"].asString();
                                                 response["FD"] = tempfd;
+						cout<<"hello "<<endl;
                                         }
-                                        else
+                                        else 
                                         {
-                                                insertIntoMessage(root["from"].asString().c_str(), root["to"].asString().c_str(), root["msg"].asString().c_str(), db);
+                                                if (insertIntoMessage(root["from"].asString().c_str(), root["to"].asString().c_str(), root["msg"].asString().c_str(), db) == true)
+						{
+							cout<<"store is ok"<<endl;
+						}
+						else
+						{
+							cout<<"store error"<<endl;
+						}
                                                 response["FD"] = root["FD"].asInt();
                                                 response["msgtype"] = EN_MSG_ACK;
                                                 response["ackcode"] = "he isn't inline";
@@ -178,33 +191,36 @@ bool sendMesgFromDb(CMysql &db, int tofd, const char*name, int fd)
 {
         Json::Value response;
         char *buff;
-        char *temp=(char *)malloc(MESSAGE_MAX_LENGTH*sizeof(char));
+        
+	char *temp=(char *)malloc(MESSAGE_MAX_LENGTH*sizeof(char));
         if (temp == NULL) return false;
-		memset(temp, 0, MESSAGE_MAX_LENGTH);
-        if (!findMesgByName(db, name, temp, MESSAGE_MAX_LENGTH))
+	memset(temp, 0, MESSAGE_MAX_LENGTH);
+
+        if (findMesgByName(db, name, temp, MESSAGE_MAX_LENGTH) == false)
         {
                 free(temp);
 		temp = NULL;
-                return false;
+                return true;
         }
         else
         {
+		delSendedMsg(db, name);
                 const char *tmp = "-";
                 char *fromuser = strtok(buff, tmp);
                 char *msg = strtok(NULL, tmp);
-
+		
                 response["FD"] = tofd;
                 response["msgtype"] = EN_MSG_ACK;
-                response["msg"] = buff;
-                response["from"] = fromuser;
+                response["msg"] = "niaho";//buff;
+                response["from"] = "zhognguo";//fromuser;
 
                 int x = send(fd, response.toStyledString().c_str(), strlen(response.toStyledString().c_str()), 0);
-                free(temp);
-				temp = NULL;
                 if (x == -1)
                 {
                         return false;
                 }
+                free(temp);
+		temp = NULL;
                 return true;
         }
 }
