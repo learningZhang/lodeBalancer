@@ -66,22 +66,22 @@ int main(int argc, char **argv)
            		{
 	          	 	cout<<"register failed!"<<endl;
 	       		}
-		 	continue;
-		 }
+		 		continue;
+		 	}
 		 	
                 case 3:
-	        {
-			offline(clientfd);
-			close(clientfd);
-	        	cout<<"bye bye..."<<endl;
-	        	exit(0);
-	        }
+	        	{
+					offline(clientfd);
+					close(clientfd);
+	        		cout<<"bye bye..."<<endl;
+	        		exit(0);
+	        	}
 	        
                 default:
-	        {
+	        	{
                    	cout<<"invalid input!"<<endl;
-			continue;
-		}
+					continue;
+				}
         }
     }
     
@@ -94,13 +94,16 @@ int main(int argc, char **argv)
     {
         char chatbuf[1024] = {0};
         cin.getline(chatbuf, 1024);
-        
+        if (strlen(chatbuf) == 0)
+		{
+			continue;
+		}
         if(strcmp(chatbuf, "quit") == 0)
         {
 	        offline(clientfd);
 	        cout<<"by close to shutdown client"<<endl;
 			close(clientfd);
-                exit(0);
+        	exit(0);
         }
         
         string parsestr = chatbuf;
@@ -111,14 +114,14 @@ int main(int argc, char **argv)
         root["to"] = parsestr.substr(0, offset);
         root["msg"] = parsestr.substr(offset+1, parsestr.length()-offset-1);
         size = send(clientfd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str())+1, 0);
-	if (size <= 0)
-	{
-		cout<<"send error"<<endl;
-		if (errno)
+		if (size <= 0)
 		{
-			cout<<"errno  is: "<<errno<<endl;
-		}	
-	}
+			cout<<"send error"<<endl;
+			if (errno)
+			{
+				cout<<"errno  is: "<<errno<<endl;
+			}		
+		}
     }
     return 0;
 }
@@ -135,11 +138,18 @@ void* ReadThread(void *arg)
 
     while(true)
     {
-        if(recv(clientfd, recvbuf, 1024, 0) <= 0)
+        int size = recv(clientfd, recvbuf, 1024, 0);
+		if (size == 0)
         {
-            cout<<"server connect fail!"<<endl;
+ 			close(clientfd);
+           	cout<<"server connect fail!"<<endl;
 	    	return 0;//can reconnnet the server??//连接失败直接退出
         }
+		else if (size < 0)
+		{
+			cout<<"read error"<<endl;
+		}
+
         if(reader.parse(recvbuf, root))
         {
             switch(root["msgtype"].asInt())
@@ -150,10 +160,10 @@ void* ReadThread(void *arg)
                 }
                 break;
                 case EN_MSG_ACK:
-	            {
-		            cout<<root["ackcode"].asString()<<endl;
-	            }
-	            break;
+	        	{
+					cout<<root["ackcode"].asString()<<endl;
+	        	}
+	       	 	break;
             }
         }
     }
@@ -197,6 +207,7 @@ bool registe(int fd)
 	}
 	else if(size == 0)
 	{
+		close(fd);
 		cout<<"bronken in 198"<<endl;
 		exit(-1);
 	}
@@ -240,6 +251,7 @@ bool doLogin(int fd, char *name)
     int size = recv(fd, recvbuf, 1024, 0);
     if(size == 0)//连接断开
     {
+	close(fd);
         cout<<"recv server login ack fail!"<<endl;
         exit(0);
     }
@@ -270,17 +282,8 @@ bool offline(int fd)//主动打招呼断开还是直接断开--》服务器的�
 {
 	Json::Value  root;
 	root["msgtype"] = EN_MSG_OFFLINE;
-	if(send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str()), 0)==0)
+	if(send(fd, root.toStyledString().c_str(), strlen(root.toStyledString().c_str()), 0)==0)//向lb发送信息表示自己要退出
 	{
-		cout<<"errno "<<errno<<endl;
+		cout<<"errno "<<strerror(errno)<<endl;
 	}
 }
-
-//1.密码加密   密钥+明文
-//将密钥存放在客户机中，输入信息之后，和密钥进行加密，将加密后的字符发送给服务器，然后由
-//服务器进行匹配
-
-//2.长连接，短链接
-//3.群聊功能
-//4.突发事件的处理
-//5.留言功能的实现

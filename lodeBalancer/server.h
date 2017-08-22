@@ -27,4 +27,6 @@ bool  findMesgByName(CMysql &db, const char*name, char *str, int length);
 
 int   searchFd(CMysql &db, const char *name);
 
+bool delSendedMsg(CMysql &db, const char *name);
+
 bool  sendMesgFromDb(CMysql &db, int tofd, const char*name, int fd);

@@ -2,22 +2,38 @@
 #include <pthread.h>
 #include <unistd.h>
 #include "mutex.h"
+#include <iostream>
+using namespace std;
+#include <stdio.h>
+#include <stdlib.h>
 CMutex::CMutex()
 {
-	assert(pthread_mutex_init(&mutex, NULL)!=0);
+	if (pthread_mutex_init(&mutex, NULL)==0)
+	{
+		return ;
+	}
+	else
+	{
+		cout<<"error"<<endl;
+		exit(-1);
+	}
 }
+
 CMutex::~CMutex()
 {
 	pthread_mutex_destroy(&mutex);
 }
+
 bool CMutex::lock()
 {
 	return pthread_mutex_lock(&mutex)==0;
 }
+
 bool CMutex::trylock()
 {
 	return pthread_mutex_trylock(&mutex)==0;	
 }
+
 bool CMutex::unlock()
 {
 	return pthread_mutex_unlock(&mutex);
@@ -45,9 +61,9 @@ void get_pipefd_clock(int &disable, int epollfd, int fd, CMutex &mutex)
 
 void getoff_pipefd_clock(int epollfd, int fd, CMutex &mutex)
 {
-	if (metex.unlock()== true)
+	if (mutex.unlock()== true)
 	{
-		delEvent(epollfd, fd);//将管道文件描述符从epoll中去除
+		deleteEvent(epollfd, fd);//将管道文件描述符从epoll中去除
 	}
 	else
 	{
