@@ -263,27 +263,34 @@ void Listenfd(evutil_socket_t fd, short int , void *arg)//主线程
 
 ConnectServer** server_start(CConHash* &conhash)//试图用设计模式中的模式来将其处理的更加平滑
 {
-	char *ip1 = "127.0.0.2";
-	char *ip2 = "127.0.0.3";
-	char *ip3 = "127.0.0.4";
+	FILE * fptr = fopen(".//config.txt", "r");//以只读方式打开
+	assert(fptr !=  NULL);
 	ConnectServer **server = new ConnectServer*[FD_NUM];
 	
-	server[0] = new ConnectServer(ip1, 6002);
-	server[1] = new ConnectServer(ip2, 6003);
-	server[2] = new ConnectServer(ip3, 6004);
-
-	CNode_s * node1 = new CNode_s("machineA", 280, ip1);//建立一个结点
-	CNode_s * node2 = new CNode_s("machineB", 280, ip2);
-	CNode_s * node3 = new CNode_s("machineC", 280, ip3);
-
-	conhash->addNode_s(node1); 
-	conhash->addNode_s(node2);
-	conhash->addNode_s(node3);
+	int num;fscanf(fptr, "%d", &num);
+	int i=0;
+	CNode_s * node = NULL;
+	//服务器的配置：服务器名称,ip地址,port端口,虚拟结点的个数
+	char machinename[20];
+	char ip[20];
+	int port;
+	int virtualNodeNum;
+	                   
+	while (i<num )
+	{
+		fscanf(fptr, "%s %s %d %d", machinename, ip, &port, &virtualNodeNum);
+		server[i] = new ConnectServer(ip, port);
+		node = new CNode_s(machinename, virtualNodeNum, ip);//建立一个结点
+		conhash->addNode_s(node); 
+		++i;
+	}
 	
 	for (int i=0; i<FD_NUM; ++i)
 	{
 		serverfd[i] = server[i]->clientfd;
 	}	
+	
+	fclose(fptr);
 	return server;
 }
 

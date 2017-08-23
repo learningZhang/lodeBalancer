@@ -1,6 +1,12 @@
 #include "head.h"
 #include "client.h"
 
+void sigintHandle(int)
+{
+	cout<<"bye bye"<<endl;
+	exit(1);
+}
+
 int main(int argc, char **argv)
 {
     int port=10001;
@@ -24,6 +30,8 @@ int main(int argc, char **argv)
         cout<<"connect server fail!"<<endl;
         return -1;
     }
+    
+    signal(SIGINT, sigintHandle);
     
     char choice = 0;
     bool bloginsuccess = false;
